@@ -1,4 +1,4 @@
-# 从零实现 Coding Agent（23）：Skills 系统
+# 从零实现 Coding Agent（二十三）：Skills 系统
 
 前面我们实现了 MCP Client，让 Agent 能动态连接外部工具。但 Agent 的行为模式仍然是通用的——面对不同类型的任务，它使用相同的系统提示和工具集。
 

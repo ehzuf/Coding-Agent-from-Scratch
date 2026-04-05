@@ -1,4 +1,4 @@
-# 从零实现 Coding Agent（22）：MCP Client
+# 从零实现 Coding Agent（二十二）：MCP Client
 
 前几篇我们实现了 Agent 的记忆系统（Session Memory + Auto-Memory）。但 Agent 的能力仍然局限于内置的 7 个工具。如果用户想让 Agent 查询数据库、访问 GitHub API、搜索文档，都需要手动开发新工具。
 
