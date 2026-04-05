@@ -33,18 +33,24 @@ context: fork
 Skill 文件按两级目录加载：
 
 ```
-~/.coding-agent/skills/          ← 用户级（全局共享）
-  code-review.md
-  commit-message.md
+~/.coding-agent/skills/          <- 用户级（全局共享）
+  code-review/
+    SKILL.md
+  commit-message/
+    SKILL.md
   
-.coding-agent/skills/            ← 项目级（仅当前项目）
-  deploy-check.md
-  test-strategy.md
+.coding-agent/skills/            <- 项目级（仅当前项目）
+  deploy-check/
+    SKILL.md
+  test-strategy/
+    SKILL.md
 ```
 
+> **注意**：Claude Code 使用目录格式 `skills/name/SKILL.md`，每个 Skill 是一个目录。我们的教学实现做了简化，也支持直接使用 `skills/name.md` 文件格式，降低使用门槛。
+
 加载规则：
-1. 先加载用户级 `~/.coding-agent/skills/*.md`
-2. 再加载项目级 `.coding-agent/skills/*.md`
+1. 先加载用户级 `~/.coding-agent/skills/*/SKILL.md`（或 `*.md`）
+2. 再加载项目级 `.coding-agent/skills/*/SKILL.md`（或 `*.md`）
 3. **同名覆盖**：项目级的 Skill 覆盖用户级同名 Skill
 
 这样可以在项目中定制特定的工作流，同时共享全局通用 Skill。

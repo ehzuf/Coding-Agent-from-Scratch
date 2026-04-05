@@ -6,7 +6,7 @@
 
 本篇实现 **会话持久化（Session Persistence）**：把消息历史写入磁盘，支持 `--resume` 从中断处继续。
 
-这对应 Claude Code 源码中的 `history.ts` + `sessionStorage.ts` + `sessionRestore.ts`。
+这对应 Claude Code 源码中的 `sessionStorage.ts` + `sessionRestore.ts`（注意：`history.ts` 是命令行上翻历史功能，不是会话持久化）。
 
 ---
 
@@ -235,15 +235,15 @@ if config.enable_session:
 | 维度 | Claude Code | 我们的实现 |
 |------|-------------|------------|
 | 存储格式 | JSONL | JSONL |
-| 存储位置 | `~/.claude/history.jsonl` | `~/.coding-agent/sessions/{id}.jsonl` |
+| 存储位置 | `~/.claude/projects/<hash>/` | `~/.coding-agent/sessions/{id}.jsonl` |
 | 并发控制 | lockfile（多进程安全） | 单进程（无需锁） |
 | 大内容处理 | hash → paste store（>1024字符外存） | 直接内联（简化） |
-| 会话粒度 | 单文件 + sessionId 过滤 | 每会话独立文件 |
+| 会话粒度 | 每会话独立 JSONL 文件 | 每会话独立文件 |
 | 恢复范围 | messages + file history + attribution + todos | messages（核心） |
 | 异步写入 | pending buffer + async flush | 同步追加（简单可靠） |
 
 我们的实现更简单：
-- **每会话一个文件**（vs Claude Code 的全局单文件 + sessionId 过滤），查找和管理更直观
+- **每会话一个文件**，查找和管理更直观
 - **同步写入**（vs async flush with pending buffer），不会丢失消息
 - **只恢复消息**（vs 恢复 file history、attribution、todos 等），MVP 足够
 

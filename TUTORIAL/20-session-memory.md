@@ -16,6 +16,8 @@ Session Memory 的核心理念很简单：
 
 对应 Claude Code 中的 `services/SessionMemory/sessionMemory.ts`，我们的 Python 实现做了简化：不使用 forked sub-agent，而是直接调用 `llm.chat()` 提取笔记。
 
+> **教学简化**：Claude Code 使用 `runForkedAgent` 启动独立子 Agent 来提取笔记，子 Agent 拥有完整的工具能力（如读取文件）。此外 Claude Code 还有 token 阈值（10000 tokens）作为额外触发条件，形成"工具调用次数 + token 增量"的双阈值机制。我们简化为单一的工具调用计数触发 + 直接 `llm.chat()` 提取。
+
 ## 笔记模板
 
 ```python
@@ -57,7 +59,7 @@ _逐步记录做了什么，简洁精炼_
 class SessionMemory:
     llm: BaseLLM
     notes: str = ""
-    update_interval: int = 8  # 每 8 次工具调用更新一次
+    update_interval: int = 3  # 每 3 次工具调用更新一次
     _tool_calls_since_update: int = 0
     _initialized: bool = False
     _update_count: int = 0
@@ -66,7 +68,7 @@ class SessionMemory:
 核心字段：
 - `llm`：用于笔记提取的 LLM 实例（复用主 Agent 的 LLM）
 - `notes`：当前笔记内容（markdown 格式）
-- `update_interval`：触发更新的工具调用间隔，默认 8 次
+- `update_interval`：触发更新的工具调用间隔，默认 3 次（Claude Code 的 `toolCallsBetweenUpdates` 默认值也是 3）
 - `_tool_calls_since_update`：距上次更新的工具调用计数
 - `_initialized`：是否已完成首次笔记提取
 
@@ -252,7 +254,7 @@ def _check_and_compact(self) -> None:
                 notes = self.session_memory.get_notes_for_injection()
                 if notes:
                     for i, msg in enumerate(self.messages):
-                        if msg.get("role") == "system" and "[历史摘要]" in msg.get("content", ""):
+                        if msg.get("role") == "user" and "[历史摘要]" in msg.get("content", ""):
                             self.messages[i]["content"] += "\n\n" + notes
                             break
 ```
@@ -348,7 +350,7 @@ LLM 调用
 
 Session Memory 解决了长对话中的"信息遗忘"问题：
 
-- **定期提取**：每 8 次工具调用，LLM 自动分析对话，更新结构化笔记
+- **定期提取**：每 3 次工具调用，LLM 自动分析对话，更新结构化笔记
 - **压缩保护**：上下文压缩时，笔记作为"不可丢失的上下文"注入
 - **静默运行**：整个机制对用户透明，不增加交互负担
 - **序列化支持**：笔记随会话持久化，恢复时不丢失

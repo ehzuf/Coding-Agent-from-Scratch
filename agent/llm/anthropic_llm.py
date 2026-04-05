@@ -51,48 +51,24 @@ def _add_cache_control_to_system(system: str) -> list[dict]:
     ]
 
 
-def _find_cache_breakpoint(messages: list[dict], start_from: int) -> int:
-    """
-    从 start_from 位置往前搜索，找到最近的 assistant 消息作为缓存断点。
-
-    为什么必须是 assistant 消息？
-    一次完整的对话轮次是 user + assistant。cache_control 打在 assistant 上，
-    确保缓存边界是一个完整轮次的结尾。如果打在 user 上：
-    1. 缓存了半个轮次（user 请求在缓存里，对应的 assistant 回复不在）
-    2. 在 tool use 场景下，可能把 tool_use → tool_result 的逻辑单元从中间切断
-
-    Returns:
-        assistant 消息的索引，找不到则返回 -1
-    """
-    for i in range(start_from, -1, -1):
-        if messages[i].get("role") == "assistant":
-            return i
-    return -1
-
-
 def _add_cache_control_to_messages(messages: list[dict]) -> list[dict]:
     """
-    在消息历史中添加 cache_control 标记，标记最近一次大型历史断点。
+    在消息历史中添加 cache_control 标记。
 
-    策略：
-    - 只在消息历史足够长（>= 4 条）时才打 cache 标记，避免短对话浪费
-    - 从倒数第 2 条消息往前搜索，找到最近的 assistant 消息作为断点
-      （此函数在 API 调用时执行，此时最后一条消息一定是刚追加的 user 消息，
-      所以从倒数第 2 条开始搜索，确保至少留最新的 user 消息不被缓存）
+    策略（与 Claude Code 一致）：
+    - 在最后一条消息上打 cache_control 标记（无论角色是什么）
+      Claude Code 直接在 messages[messages.length - 1] 上打标记，
+      不搜索特定角色，确保尽可能多的内容被缓存
     - 每次调用只打 1 个 breakpoint（加上 system 共最多 2 个，留余量给 tools）
     - 注意：这里是浅拷贝，只替换需要修改的消息，不修改原始 messages
 
     Returns:
         修改后的 messages 列表（原始列表不被修改）
     """
-    if len(messages) < 4:
+    if not messages:
         return messages
 
-    # 从倒数第 2 条往前找最近的 assistant 消息
-    # （最后一条一定是刚追加的 user prompt，跳过它）
-    cache_idx = _find_cache_breakpoint(messages, len(messages) - 2)
-    if cache_idx < 0:
-        return messages
+    cache_idx = len(messages) - 1
 
     result = list(messages)  # 浅拷贝列表
     msg = result[cache_idx]

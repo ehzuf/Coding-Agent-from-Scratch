@@ -172,6 +172,8 @@ def get_strict_permission_config() -> PermissionConfig:
 
 ## 三种权限模式
 
+> **教学简化**：Claude Code 实际有 7 种权限模式，包括 `auto`（AI 分类器自动判断是否需要确认）、`plan`（规划模式）、`acceptEdits`（自动接受编辑）等。我们这里实现 3 种核心模式，覆盖最常见的使用场景。
+
 | 模式 | 说明 | 适用场景 |
 |------|------|----------|
 | `ask` | 默认询问，只读操作自动允许 | 日常使用 |

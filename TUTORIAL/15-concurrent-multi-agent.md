@@ -155,6 +155,8 @@ def format_task_notification(
 
 为什么用 XML 而不是 JSON？因为 **LLM 对 XML 标签的解析更稳定**。Claude Code 也是用 `<task-notification>` XML 格式。在 tool_result 中嵌入 JSON 容易被 LLM 误解析（JSON 的引号和转义与自然语言混淆），XML 的开闭标签更明确。
 
+> **教学简化**：我们的 XML schema 与 Claude Code 的略有不同（字段名和嵌套结构有差异），但核心思路一致：用结构化 XML 让 Coordinator 能可靠地解析 Worker 返回的结果。
+
 输出示例：
 
 ```xml

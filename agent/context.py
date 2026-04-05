@@ -159,14 +159,7 @@ def _process_memory_file(
 
     result = []
 
-    # 提取并递归处理 @include
-    base_dir = str(Path(file_path).parent)
-    include_paths = _extract_include_paths(content, base_dir)
-
-    for inc_path in include_paths:
-        included = _process_memory_file(inc_path, memory_type, processed, depth + 1)
-        result.extend(included)
-
+    # 主文件排在前面（父优先于子，与 Claude Code 一致）
     # 生成友好的 source 描述
     home = str(Path.home())
     display_path = file_path.replace(home, "~") if file_path.startswith(home) else file_path
@@ -177,6 +170,14 @@ def _process_memory_file(
         memory_type=memory_type,
         source=display_path,
     ))
+
+    # 提取并递归处理 @include（被引用的文件排在后面）
+    base_dir = str(Path(file_path).parent)
+    include_paths = _extract_include_paths(content, base_dir)
+
+    for inc_path in include_paths:
+        included = _process_memory_file(inc_path, memory_type, processed, depth + 1)
+        result.extend(included)
 
     return result
 

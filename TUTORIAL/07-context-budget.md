@@ -161,11 +161,13 @@ def compact_messages(
     ).text
 
     # 构建新的消息列表
+    # 注意：摘要作为 role="user" 消息存入，与 Claude Code 一致
+    # （Claude Code 的 summaryMessages 类型是 UserMessage[]）
     new_messages = []
     if system_msg:
         new_messages.append(system_msg)
     new_messages.append({
-        "role": "system",
+        "role": "user",
         "content": f"[历史摘要] {summary}",
     })
     new_messages.extend(recent_messages)
@@ -178,6 +180,8 @@ def compact_messages(
 - **最近对话通常最重要**：包含当前任务的上下文
 - **旧对话可以抽象**：只需要知道"讨论了什么"，不需要知道"具体说了什么"
 - **平衡质量和成本**：保留太多失去压缩意义，保留太少丢失上下文
+
+> **教学简化**：我们的摘要 prompt 是简单的一句话。Claude Code 使用 9 段式结构化 prompt（包含 `<analysis>` 分析步骤和 `<summary>` 输出格式），并在摘要末尾附加"Continue the conversation from where it left off without asking the user any further questions..."等续接指令。生产环境建议参考其设计以提升摘要质量。
 
 ### 集成到 Agent
 

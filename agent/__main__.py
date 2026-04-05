@@ -21,7 +21,6 @@ from agent.agent import Agent, StreamEvent
 from agent.tools import get_tools
 from agent.context import build_system_prompt, get_context_info
 from agent.config import load_config, get_default_model
-from agent.llm.anthropic_llm import _find_cache_breakpoint
 from agent.permission import (
     PermissionConfig,
     get_default_permission_config,
@@ -307,10 +306,9 @@ def show_cache_info(agent: Agent):
 
     # 确定 cache_control 标记位置（仅 Anthropic 有意义）
     # show_cache_info 在请求后调用，此时最后一条是 assistant。
-    # 下次 API 调用会追加一条 user，_add_cache_control_to_messages 从 len-2 开始搜索 assistant。
-    # 等价于：从当前消息的最后一条（assistant）往前搜索。
-    if len(messages) >= 4:
-        cache_idx = _find_cache_breakpoint(messages, len(messages) - 1)
+    # 下次 API 调用会追加一条 user，_add_cache_control_to_messages 直接在 len-1 打标记。
+    if len(messages) >= 2:
+        cache_idx = len(messages) - 1
     else:
         cache_idx = -1
 

@@ -49,7 +49,7 @@ class ReadTool(Tool):
                 },
                 "offset": {
                     "type": "integer",
-                    "description": "从第几行开始读取（默认 0，即从第一行开始）",
+                    "description": "从第几行开始读取（默认 1，即第一行，1-based）",
                 },
                 "limit": {
                     "type": "integer",
@@ -64,7 +64,7 @@ class ReadTool(Tool):
 
     def call(self, input: dict[str, Any]) -> str:
         file_path = input.get("file_path", "")
-        offset = input.get("offset", 0)
+        offset = input.get("offset", 1)
         limit = input.get("limit")
 
         if not file_path:
@@ -96,16 +96,16 @@ class ReadTool(Tool):
             if content is None:
                 return f"错误：无法解码文件（尝试了编码: {encodings}），可能是二进制文件"
 
-            # 应用 offset 和 limit
-            if offset > 0:
-                content = content[offset:]
+            # 应用 offset 和 limit（offset 是 1-based）
+            if offset > 1:
+                content = content[offset - 1:]
 
             if limit is not None and limit > 0:
                 content = content[:limit]
 
             # 添加行号
             total_lines = len(content)
-            start_line = offset + 1
+            start_line = offset
 
             lines_with_numbers = []
             for i, line in enumerate(content):

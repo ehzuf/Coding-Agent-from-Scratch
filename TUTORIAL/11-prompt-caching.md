@@ -83,26 +83,18 @@ def _add_cache_control_to_system(system: str) -> list[dict]:
 ```python
 def _add_cache_control_to_messages(messages: list[dict]) -> list[dict]:
     """
-    在较早的历史消息上打 cache_control 标记。
+    在历史消息上打 cache_control 标记。
     
     策略：
-    - 消息数 >= 4 才打标记（太短的对话没必要缓存）
-    - 从倒数第 2 条往前搜索最近的 assistant 消息，在其上打标记
-      （一轮完整对话是 user + assistant，断在 assistant 上确保缓存边界是完整轮次）
+    - 在最后一条消息上打标记（无论角色是什么）
+      Claude Code 采用相同策略：直接在 messages[messages.length - 1] 上打标记，
+      不搜索特定角色，确保尽可能多的内容被缓存
     - 只打 1 个 breakpoint（加上 system 共 2 个，最多 4 个，留余量给 tools）
     """
-    if len(messages) < 4:
+    if not messages:
         return messages
 
-    # 从倒数第 2 条往前找最近的 assistant 消息
-    # （最后一条一定是刚追加的 user prompt，跳过它）
-    cache_idx = -1
-    for i in range(len(messages) - 2, -1, -1):
-        if messages[i].get("role") == "assistant":
-            cache_idx = i
-            break
-    if cache_idx < 0:
-        return messages
+    cache_idx = len(messages) - 1
 
     result = list(messages)  # 浅拷贝，不修改原始列表
     msg = result[cache_idx]
@@ -304,7 +296,7 @@ Tools 定义:    ~983 tokens（7 个工具）
 
 从这里可以看到：
 1. **缓存的组成**：system prompt + tools 定义 + 完整的历史对话轮次
-2. **cache_control 标记位置**：最近的 assistant 消息，确保缓存边界是完整轮次
+2. **cache_control 标记位置**：最后一条消息，确保尽可能多的内容被缓存
 3. **具体费用节省**：已缓存的 token 下次请求只付 10% 费用
 
 如果用的是 OpenAI 后端，显示会不同——没有 breakpoint 标记（因为是自动缓存），但会显示预估可缓存的总量。
@@ -316,10 +308,10 @@ Tools 定义:    ~983 tokens（7 个工具）
 ```python
 def show_cache_info(agent: Agent):
     is_anthropic = agent._is_anthropic
-    
+
     if is_anthropic:
-        # 从最后一条消息往前搜索最近的 assistant，作为 breakpoint 位置
-        cache_idx = _find_cache_breakpoint(messages, len(messages) - 1)
+        # 直接在最后一条消息上打 cache_control（与 Claude Code 一致）
+        cache_idx = len(messages) - 1
         # 计算 system + tools + 历史前部分的总缓存量
     else:
         # OpenAI 自动缓存，显示预估可缓存总量

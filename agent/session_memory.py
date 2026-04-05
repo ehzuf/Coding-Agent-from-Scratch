@@ -27,8 +27,8 @@ from dataclasses import dataclass, field
 from agent.llm.base import BaseLLM
 
 
-# 默认：每 8 次工具调用后更新一次
-DEFAULT_UPDATE_INTERVAL = 8
+# 默认：每 3 次工具调用后更新一次（与 Claude Code 的 toolCallsBetweenUpdates 一致）
+DEFAULT_UPDATE_INTERVAL = 3
 
 # 笔记最大 token 数（估算）
 MAX_NOTES_TOKENS = 4000

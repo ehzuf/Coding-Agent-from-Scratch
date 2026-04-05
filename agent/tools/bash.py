@@ -66,7 +66,7 @@ class BashTool(Tool):
                 },
                 "timeout": {
                     "type": "number",
-                    "description": "超时时间（秒），默认 120",
+                    "description": "超时时间（毫秒），默认 120000",
                 },
                 "cwd": {
                     "type": "string",
@@ -117,7 +117,7 @@ class BashTool(Tool):
 
     def call(self, input: dict[str, Any]) -> str:
         command = input.get("command", "")
-        timeout = input.get("timeout", 120)
+        timeout = input.get("timeout", 120000)
         cwd = input.get("cwd")
 
         if not command:
@@ -132,7 +132,7 @@ class BashTool(Tool):
                 ["bash", "-c", command],
                 capture_output=True,
                 text=True,
-                timeout=timeout,
+                timeout=timeout / 1000,  # 转换为秒
                 cwd=cwd,
             )
 
@@ -150,6 +150,6 @@ class BashTool(Tool):
             return "\n\n".join(output_parts)
 
         except subprocess.TimeoutExpired:
-            return f"错误：命令执行超时（{timeout} 秒）"
+            return f"错误：命令执行超时（{timeout}ms）"
         except Exception as e:
             return f"错误：执行命令失败 - {e}"

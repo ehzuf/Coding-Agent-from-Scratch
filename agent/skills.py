@@ -122,45 +122,67 @@ def _load_skills_from_dir(
     source_type: str,
     skills: dict[str, SkillDefinition],
 ) -> None:
-    """从目录加载 Skill 文件。"""
+    """从目录加载 Skill 文件。支持两种格式：
+    - 文件格式：skills/name.md
+    - 目录格式：skills/name/SKILL.md（Claude Code 格式）
+    """
     if not os.path.isdir(directory):
         return
 
-    for filename in sorted(os.listdir(directory)):
-        if not filename.endswith(".md"):
+    for entry in sorted(os.listdir(directory)):
+        entry_path = os.path.join(directory, entry)
+
+        # 目录格式：skills/name/SKILL.md
+        if os.path.isdir(entry_path):
+            skill_file = os.path.join(entry_path, "SKILL.md")
+            if os.path.isfile(skill_file):
+                _load_single_skill(skill_file, entry, source_type, skills)
             continue
 
-        filepath = os.path.join(directory, filename)
-        if not os.path.isfile(filepath):
+        # 文件格式：skills/name.md
+        if not entry.endswith(".md"):
+            continue
+        if not os.path.isfile(entry_path):
             continue
 
-        try:
-            content = Path(filepath).read_text(encoding="utf-8")
-            fm, body = _parse_frontmatter(content)
+        default_name = entry.replace(".md", "")
+        _load_single_skill(entry_path, default_name, source_type, skills)
 
-            if not body:
-                continue
 
-            # 从 frontmatter 或文件名推断 name
-            name = fm.get("name", filename.replace(".md", ""))
-            description = fm.get("description", "")
-            allowed_tools = fm.get("allowed_tools", [])
-            if isinstance(allowed_tools, str):
-                allowed_tools = [allowed_tools]
-            context = fm.get("context", "fork")
+def _load_single_skill(
+    filepath: str,
+    default_name: str,
+    source_type: str,
+    skills: dict[str, SkillDefinition],
+) -> None:
+    """加载单个 Skill 文件。"""
+    try:
+        content = Path(filepath).read_text(encoding="utf-8")
+        fm, body = _parse_frontmatter(content)
 
-            skill = SkillDefinition(
-                name=name,
-                description=description,
-                prompt=body,
-                source=f"[{source_type}] {filepath}",
-                allowed_tools=allowed_tools,
-                context=context,
-            )
-            skills[name] = skill
+        if not body:
+            return
 
-        except Exception:
-            continue
+        # 从 frontmatter 或文件名推断 name
+        name = fm.get("name", default_name)
+        description = fm.get("description", "")
+        allowed_tools = fm.get("allowed_tools", [])
+        if isinstance(allowed_tools, str):
+            allowed_tools = [allowed_tools]
+        context = fm.get("context", "fork")
+
+        skill = SkillDefinition(
+            name=name,
+            description=description,
+            prompt=body,
+            source=f"[{source_type}] {filepath}",
+            allowed_tools=allowed_tools,
+            context=context,
+        )
+        skills[name] = skill
+
+    except Exception:
+        pass
 
 
 # ============================================================================

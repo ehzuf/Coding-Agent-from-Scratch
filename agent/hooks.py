@@ -197,7 +197,7 @@ def _run_hook_command(
             stdout=stdout,
             stderr=stderr,
             exit_code=2,
-            block_reason=stdout or stderr or f"Blocked by hook: {hook.command}",
+            block_reason=stderr or "Hook blocked execution",
         )
 
     # 尝试解析 JSON 输出（支持 updatedInput）

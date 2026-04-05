@@ -55,7 +55,7 @@ class BashTool(Tool):
                 },
                 "timeout": {
                     "type": "number",
-                    "description": "超时时间（秒），默认 120",
+                    "description": "超时时间（毫秒），默认 120000",
                 },
                 "cwd": {
                     "type": "string",
@@ -67,14 +67,14 @@ class BashTool(Tool):
 
     def call(self, input: dict[str, Any]) -> str:
         command = input.get("command", "")
-        timeout = input.get("timeout", 120)
+        timeout = input.get("timeout", 120000)
         cwd = input.get("cwd")
 
         result = subprocess.run(
             ["bash", "-c", command],
             capture_output=True,
             text=True,
-            timeout=timeout,
+            timeout=timeout / 1000,  # 转换为秒
             cwd=cwd,
         )
 
@@ -84,7 +84,7 @@ class BashTool(Tool):
 ### 关键点
 
 - **`capture_output=True`**：捕获 stdout 和 stderr
-- **`timeout`**：防止命令无限运行
+- **`timeout`**：防止命令无限运行（注意：参数单位为毫秒，与 Claude Code 一致。内部传给 `subprocess.run` 时需转换为秒）
 - **`cwd`**：支持在指定目录执行
 
 ### 使用示例
@@ -133,7 +133,7 @@ class ReadTool(Tool):
                 },
                 "offset": {
                     "type": "integer",
-                    "description": "从第几行开始读取（默认 0）",
+                    "description": "从第几行开始读取（默认 1，即第一行）",
                 },
                 "limit": {
                     "type": "integer",
@@ -145,20 +145,20 @@ class ReadTool(Tool):
 
     def call(self, input: dict[str, Any]) -> str:
         file_path = input.get("file_path", "")
-        offset = input.get("offset", 0)
+        offset = input.get("offset", 1)
         limit = input.get("limit")
 
         with open(file_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
-        if offset > 0:
-            lines = lines[offset:]
+        if offset > 1:
+            lines = lines[offset - 1:]
         if limit:
             lines = lines[:limit]
 
         # 添加行号
         result = []
-        for i, line in enumerate(lines, offset + 1):
+        for i, line in enumerate(lines, offset):
             result.append(f"{i:6}\t{line.rstrip()}")
 
         return "\n".join(result)
@@ -219,8 +219,9 @@ class WriteTool(Tool):
 ### 设计要点
 
 1. **Read 带行号**：方便 LLM 引用特定行
-2. **Read 支持 offset/limit**：处理大文件时避免超出上下文窗口
+2. **Read 支持 offset/limit**：处理大文件时避免超出上下文窗口（offset 从 1 开始，1-based 行号）
 3. **Write 自动创建目录**：减少一步 mkdir 操作
+4. **Write 需要"先读后写"验证**：Claude Code 要求对已存在的文件先调用 Read 才能 Write，防止 LLM 在未阅读文件内容的情况下覆盖已有文件。我们在教学实现中省略了这一验证，但生产环境建议添加
 
 ## 文件编辑 + Glob + Grep
 

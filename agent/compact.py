@@ -169,9 +169,9 @@ def compact_messages(
     if system_msg:
         new_messages.append(system_msg)
 
-    # 添加摘要作为 system 消息
+    # 添加摘要作为 user 消息（与 Claude Code 一致，summaryMessages 类型是 UserMessage[]）
     new_messages.append({
-        "role": "system",
+        "role": "user",
         "content": f"[历史摘要] {summary}",
     })
 
@@ -230,7 +230,7 @@ def maybe_compact(
         new_messages.append(system_msg)
 
     new_messages.append({
-        "role": "system",
+        "role": "user",
         "content": f"[历史摘要] {result.summary}",
     })
     new_messages.extend(recent_messages)

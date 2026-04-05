@@ -159,6 +159,9 @@ class Agent:
                 self.turn_count += 1
                 return response
 
+            # 追加 assistant 消息（包含 tool_use blocks）
+            self.messages.append({"role": "assistant", "content": response.content})
+
             # 执行所有工具调用
             tool_results = []
             for tool_use in tool_uses:
@@ -305,8 +308,9 @@ def stream(self, prompt: str) -> Iterator[StreamEvent]:
             tool_uses.append({"id": block["id"], "name": block["name"], "input": {}})
 
         elif block.get("type") == "tool_input_delta":
-            # 累积工具参数
-            pass
+            # 累积工具参数（JSON 片段）
+            if tool_uses:
+                tool_uses[-1]["input_json"] = tool_uses[-1].get("input_json", "") + block.get("partial_json", "")
 
     # 如果有工具调用，执行并继续流式
     if tool_uses:

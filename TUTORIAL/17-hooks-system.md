@@ -314,7 +314,7 @@ def _run_hook_command(hook, env, cwd):
 
     # exit 2 = block
     if result.returncode == 2:
-        return HookResult(outcome="blocked", block_reason=stdout or stderr)
+        return HookResult(outcome="blocked", block_reason=stderr or "Hook blocked execution")
 
     # 尝试解析 JSON 输出
     if stdout.startswith("{"):
@@ -335,6 +335,8 @@ def _run_hook_command(hook, env, cwd):
 - `{**os.environ, **env}` —— 继承系统环境变量，Hook 可以访问 PATH 等
 - stdout 先尝试 JSON 解析，失败则整体作为 additionalContext
 - 超时用 `subprocess.run(timeout=...)` 处理，不会挂起 Agent
+
+> **教学简化**：Claude Code 的 Hook 输出使用嵌套的 `hookSpecificOutput` 结构，区分不同事件类型的返回格式。我们这里统一使用扁平的 JSON（`updatedInput` + `additionalContext`），降低实现复杂度。
 
 ### HookManager
 

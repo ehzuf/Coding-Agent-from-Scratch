@@ -15,6 +15,8 @@ Auto-Memory 的核心流程：
 
 对应 Claude Code 中的 `memdir/` + `services/extractMemories/`。Claude Code 使用 forked sub-agent 做提取，我们简化为直接 `llm.chat()` 调用。
 
+> **教学简化**：Claude Code 的记忆提取使用 `runForkedAgent`，子 Agent 拥有文件读写工具（如 `createMemoryFileCanUseTool()`），可以直接操作记忆文件。我们简化为让主 LLM 返回 JSON 格式的记忆内容，再由 Python 代码保存文件，降低实现复杂度。
+
 ## 记忆目录结构
 
 ```

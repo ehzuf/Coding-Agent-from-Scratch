@@ -521,7 +521,7 @@ class Agent:
                     notes = self.session_memory.get_notes_for_injection()
                     if notes:
                         for i, msg in enumerate(self.messages):
-                            if msg.get("role") == "system" and "[历史摘要]" in msg.get("content", ""):
+                            if msg.get("role") == "user" and "[历史摘要]" in msg.get("content", ""):
                                 self.messages[i]["content"] += "\n\n" + notes
                                 break
 

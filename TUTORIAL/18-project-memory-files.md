@@ -121,7 +121,9 @@ def load_memory_files(cwd: str = ".") -> list[MemoryFile]:
         result.extend(_process_memory_file(str(d / ".coding-agent" / "AGENTS.md"), "Project", processed))
         result.extend(_load_rules_dir(str(d / ".coding-agent" / "rules"), "Project", processed))
 
-    # 3. 本地级（向上查找最近的 AGENTS.local.md）
+    # 3. 本地级（从根到 cwd 每层目录查找 AGENTS.local.md）
+    # 注：Claude Code 在每个目录层级都会加载 CLAUDE.local.md，
+    # 我们的教学实现简化为只找最近的一个
     current = abs_cwd
     while True:
         local_md = current / "AGENTS.local.md"
@@ -185,17 +187,18 @@ def _process_memory_file(file_path, memory_type, processed, depth=0):
 
     result = []
 
-    # 先处理 @include（被引用的文件排在前面）
+    # 主文件排在前面
+    result.append(MemoryFile(path=file_path, content=content, ...))
+
+    # 再处理 @include（被引用的文件排在后面，优先级更低）
     include_paths = _extract_include_paths(content, base_dir)
     for inc_path in include_paths:
         result.extend(_process_memory_file(inc_path, memory_type, processed, depth + 1))
 
-    # 主文件排在后面（优先级更高）
-    result.append(MemoryFile(path=file_path, content=content, ...))
     return result
 ```
 
-注意 include 的文件排在引用它的文件**前面**——因为后加载的优先级更高，主文件应该覆盖被引用文件的规则。
+注意 include 的文件排在引用它的文件**后面**——Claude Code 的设计是父文件优先于子文件（先加载的内容在 prompt 中更靠前）。
 
 安全措施：
 - **最大深度 5** —— 防止无限递归
