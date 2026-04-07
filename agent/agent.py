@@ -29,8 +29,8 @@ from dataclasses import dataclass
 from typing import Any, Iterator
 
 from agent.llm.base import BaseLLM, LLMResponse
-from agent.llm.anthropic_llm import AnthropicLLM
-from agent.llm.openai_llm import build_tool_result_message as build_openai_tool_result
+from agent.llm.anthropic_llm import AnthropicLLM, StreamEvent as LLMStreamEvent
+from agent.llm.openai_llm import OpenAILLM, build_tool_result_message as build_openai_tool_result
 from agent.tools import Tool, find_tool, to_api_tools
 from agent.budget import truncate_tool_result, check_context_budget
 from agent.compact import maybe_compact
@@ -689,11 +689,141 @@ class Agent:
         while turn_count < self.max_turns:
             turn_count += 1
 
+            # 尝试使用真正的流式 API（Anthropic 和 OpenAI 都支持）
+            if isinstance(self.llm, (AnthropicLLM, OpenAILLM)):
+                try:
+                    accumulated_text = ""
+                    current_tool_uses = []
+                    usage_info = {}
+                    stop_reason = None
+                    stream_success = False
+
+                    # 调用 LLM 的 stream_with_events 方法
+                    for event in self.llm.stream_with_events(
+                        self.messages,
+                        system=self.system,
+                        max_tokens=8096,
+                        tools=api_tools,
+                    ):
+                        if event.type == "text":
+                            accumulated_text += event.text
+                            yield StreamEvent(type="text", text=event.text)
+                            stream_success = True
+
+                        elif event.type == "tool_use_start":
+                            current_tool_uses.append({
+                                "id": event.id,
+                                "name": event.name,
+                                "input": event.input or {},
+                            })
+                            yield StreamEvent(
+                                type="tool_use_start",
+                                name=event.name,
+                                input=event.input,
+                            )
+                            stream_success = True
+
+                        elif event.type == "tool_use_end":
+                            # 更新最终的 input
+                            for tool in current_tool_uses:
+                                if tool["id"] == event.id:
+                                    tool["input"] = event.input or {}
+                                    break
+
+                        elif event.type == "message_end":
+                            usage_info = event.usage or {}
+                            stop_reason = event.stop_reason
+
+                    if stream_success:
+                        # 构造 LLMResponse
+                        content_blocks = []
+                        if accumulated_text:
+                            content_blocks.append({"type": "text", "text": accumulated_text})
+                        for tool in current_tool_uses:
+                            content_blocks.append({
+                                "type": "tool_use",
+                                "id": tool["id"],
+                                "name": tool["name"],
+                                "input": tool["input"],
+                            })
+
+                        response = LLMResponse(
+                            content=content_blocks,
+                            input_tokens=usage_info.get("input_tokens", 0),
+                            output_tokens=usage_info.get("output_tokens", 0),
+                            model=self.llm.model,
+                            stop_reason=stop_reason,
+                            cache_read_tokens=usage_info.get("cache_read_tokens", 0),
+                            cache_write_tokens=usage_info.get("cache_write_tokens", 0),
+                        )
+
+                        # 追加 assistant 消息
+                        assistant_msg = self._build_assistant_message(response)
+                        self.messages.append(assistant_msg)
+                        self._persist_message(assistant_msg)
+
+                        # 累加 token 统计
+                        self._total_input_tokens += response.input_tokens
+                        self._total_output_tokens += response.output_tokens
+
+                        # 如果没有 tool_use，结束循环
+                        if not current_tool_uses:
+                            final_response = response
+                            # Auto-Memory：对话结束时提取持久性记忆
+                            self._maybe_extract_memories()
+                            break
+
+                        # 有 tool_use，执行工具
+                        self._tool_use_count += len(current_tool_uses)
+
+                        # 执行所有工具调用（支持并发）
+                        batches = self._partition_tool_calls(current_tool_uses)
+                        results = [None] * len(current_tool_uses)
+
+                        for batch in batches:
+                            if len(batch) == 1:
+                                # 单个工具，直接执行
+                                idx = batch[0]
+                                results[idx] = self._execute_tool(current_tool_uses[idx])
+                                yield StreamEvent(type="tool_use_end", result=results[idx])
+                            else:
+                                # 多个并发安全工具，使用线程池
+                                with ThreadPoolExecutor(max_workers=len(batch)) as executor:
+                                    future_to_idx = {
+                                        executor.submit(
+                                            self._execute_tool, current_tool_uses[idx]
+                                        ): idx
+                                        for idx in batch
+                                    }
+                                    for future in as_completed(future_to_idx):
+                                        idx = future_to_idx[future]
+                                        try:
+                                            results[idx] = future.result()
+                                        except Exception as e:
+                                            results[idx] = f"错误：工具并发执行失败 - {e}"
+
+                                # 按原始顺序 yield 结束事件
+                                for idx in batch:
+                                    yield StreamEvent(type="tool_use_end", result=results[idx])
+
+                        # 追加 tool_result 消息
+                        tool_result_messages = self._build_tool_result_messages(
+                            current_tool_uses, results
+                        )
+                        self.messages.extend(tool_result_messages)
+                        self._persist_messages(tool_result_messages)
+
+                        # 继续下一轮（tool_use 后的回复）
+                        continue
+
+                except Exception as e:
+                    # 流式失败，回退到非流式
+                    pass
+
+            # 回退到非流式 API（支持 Tool Use，适用于 OpenAI 或 Anthropic 流式失败）
             try:
-                # 调用 LLM（带重试）
                 response = self._call_llm_with_retry(api_tools)
             except RetryError as e:
-                # 重试耗尽
                 yield StreamEvent(
                     type="text",
                     text=f"\n[错误] LLM 调用失败: {e}",
@@ -709,7 +839,7 @@ class Agent:
             self.messages.append(assistant_msg)
             self._persist_message(assistant_msg)
 
-            # 先 yield 文本内容
+            # yield 文本内容
             if response.text:
                 yield StreamEvent(type="text", text=response.text)
 

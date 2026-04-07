@@ -28,6 +28,7 @@ from typing import Any, Iterator
 from openai import OpenAI
 
 from .base import BaseLLM, LLMResponse
+from .anthropic_llm import StreamEvent
 
 
 def _get_cached_tokens(usage) -> int:
@@ -236,6 +237,140 @@ class OpenAILLM(BaseLLM):
             delta = chunk.choices[0].delta
             if delta.content is not None:
                 yield delta.content
+
+    def stream_with_events(
+        self,
+        messages: list[dict],
+        system: str | None = None,
+        max_tokens: int = 8096,
+        tools: list[dict] | None = None,
+    ) -> Iterator[StreamEvent]:
+        """
+        流式调用，返回完整事件流，支持 tool_use。
+
+        OpenAI 的流式 tool_use 与 Anthropic 不同：
+        - tool_calls 在单个 chunk 中完整返回（不是增量）
+        - 需要累积所有 chunk 中的 tool_calls
+        """
+        full_messages = self._build_messages(messages, system)
+        openai_tools = _tools_to_openai_format(tools) if tools else None
+
+        response = self._client.chat.completions.create(
+            model=self.model,
+            max_tokens=max_tokens,
+            messages=full_messages,
+            tools=openai_tools,
+            stream=True,
+            extra_body=self._extra_body or None,
+            stream_options={"include_usage": True},  # 请求返回 usage 信息
+        )
+
+        accumulated_text = ""
+        current_tool_calls = []  # OpenAI 的 tool_calls 在流中累积
+        usage_info = {}
+        finish_reason = None
+
+        for chunk in response:
+            # 某些 chunk 可能没有 choices（如 usage-only chunk）
+            if not chunk.choices:
+                # 获取 usage（某些服务在单独的 chunk 中返回）
+                if hasattr(chunk, 'usage') and chunk.usage:
+                    usage_info = {
+                        "input_tokens": getattr(chunk.usage, 'prompt_tokens', 0),
+                        "output_tokens": getattr(chunk.usage, 'completion_tokens', 0),
+                        "cache_read_tokens": _get_cached_tokens(chunk.usage),
+                    }
+                continue
+
+            delta = chunk.choices[0].delta
+
+            # 处理文本增量
+            if delta.content is not None:
+                accumulated_text += delta.content
+                yield StreamEvent(type="text", text=delta.content)
+
+            # 处理 tool_calls（OpenAI 的 tool_calls 在流中逐步累积）
+            if delta.tool_calls:
+                for tc in delta.tool_calls:
+                    # 找到或创建对应的 tool_call
+                    existing = None
+                    for existing_tc in current_tool_calls:
+                        if existing_tc.get("index") == tc.index:
+                            existing = existing_tc
+                            break
+
+                    if existing is None:
+                        # 新的 tool_call
+                        new_tc = {
+                            "index": tc.index,
+                            "id": tc.id or "",
+                            "name": tc.function.name or "",
+                            "arguments": tc.function.arguments or "",
+                            "start_event_sent": False,  # 标记是否已发送 start 事件
+                        }
+                        current_tool_calls.append(new_tc)
+                        existing = new_tc
+
+                    # 累积参数
+                    if tc.function.arguments:
+                        existing["arguments"] += tc.function.arguments
+
+                    # 更新名称（如果之前为空）
+                    if tc.function.name and not existing["name"]:
+                        existing["name"] = tc.function.name
+
+                    # 更新 id（如果之前为空）
+                    if tc.id and not existing["id"]:
+                        existing["id"] = tc.id
+
+                    # 发送 start 事件（只发送一次，当有名稱且未发送过）
+                    if existing["name"] and not existing["start_event_sent"]:
+                        yield StreamEvent(
+                            type="tool_use_start",
+                            id=existing["id"],
+                            name=existing["name"],
+                            input={},
+                        )
+                        existing["start_event_sent"] = True
+
+            # 检查 finish_reason
+            if chunk.choices[0].finish_reason:
+                finish_reason = chunk.choices[0].finish_reason
+
+            # 获取 usage（通常在最后一个 chunk）
+            if hasattr(chunk, 'usage') and chunk.usage:
+                usage_info = {
+                    "input_tokens": getattr(chunk.usage, 'prompt_tokens', 0),
+                    "output_tokens": getattr(chunk.usage, 'completion_tokens', 0),
+                    "cache_read_tokens": _get_cached_tokens(chunk.usage),
+                }
+
+        # 处理完成的 tool_calls，发送 end 事件
+        for tc in current_tool_calls:
+            try:
+                input_args = json.loads(tc["arguments"]) if tc["arguments"] else {}
+            except json.JSONDecodeError:
+                input_args = {}
+
+            yield StreamEvent(
+                type="tool_use_end",
+                id=tc["id"],
+                name=tc["name"],
+                input=input_args,
+            )
+
+        # 发送 message_end 事件
+        stop_reason = {
+            "stop": "end_turn",
+            "length": "max_tokens",
+            "tool_calls": "tool_use",
+        }.get(finish_reason, finish_reason)
+
+        yield StreamEvent(
+            type="message_end",
+            usage=usage_info,
+            stop_reason=stop_reason,
+        )
 
 
 def build_tool_result_message(tool_use_id: str, content: str) -> dict:

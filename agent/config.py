@@ -75,8 +75,18 @@ class Config:
 
         # LLM 配置
         config.provider = os.environ.get("LLM_PROVIDER", config.provider)
-        config.model = os.environ.get("ANTHROPIC_MODEL") or os.environ.get("OPENAI_MODEL")
-        config.base_url = os.environ.get("ANTHROPIC_BASE_URL") or os.environ.get("OPENAI_BASE_URL")
+
+        # 根据 provider 选择对应的环境变量
+        if config.provider == "anthropic":
+            config.model = os.environ.get("ANTHROPIC_MODEL") or config.model
+            config.base_url = os.environ.get("ANTHROPIC_BASE_URL")
+        elif config.provider == "openai":
+            config.model = os.environ.get("OPENAI_MODEL") or config.model
+            config.base_url = os.environ.get("OPENAI_BASE_URL")
+        else:
+            # 默认情况下，尝试从任意环境变量读取
+            config.model = os.environ.get("ANTHROPIC_MODEL") or os.environ.get("OPENAI_MODEL")
+            config.base_url = os.environ.get("ANTHROPIC_BASE_URL") or os.environ.get("OPENAI_BASE_URL")
 
         # 数值配置
         if max_turns := os.environ.get("AGENT_MAX_TURNS"):
@@ -128,6 +138,17 @@ class Config:
             config.model = args.model
         if hasattr(args, "base_url") and args.base_url:
             config.base_url = args.base_url
+
+        # 如果 provider 被命令行参数覆盖，需要重新根据新的 provider 选择 base_url
+        # （因为 from_env 中 base_url 的选择依赖于 provider）
+        if hasattr(args, "provider") and args.provider:
+            if args.provider == "anthropic":
+                # 如果 base_url 不是通过命令行显式指定的，重新从环境变量读取
+                if not (hasattr(args, "base_url") and args.base_url):
+                    config.base_url = os.environ.get("ANTHROPIC_BASE_URL")
+            elif args.provider == "openai":
+                if not (hasattr(args, "base_url") and args.base_url):
+                    config.base_url = os.environ.get("OPENAI_BASE_URL")
         if hasattr(args, "cwd") and args.cwd:
             config.cwd = args.cwd
         if hasattr(args, "system") and args.system:

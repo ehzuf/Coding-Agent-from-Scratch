@@ -112,6 +112,8 @@ def from_args(cls, args: Any) -> "Config":
 | `AGENT_NO_RETRY` | 禁用重试 |
 | `AGENT_NO_STREAM` | 禁用流式 |
 
+> **注意**：`ANTHROPIC_BASE_URL` 和 `OPENAI_BASE_URL` 的选择取决于 `LLM_PROVIDER` 或 `--provider` 参数。当 `provider=anthropic` 时，只读取 `ANTHROPIC_BASE_URL`；当 `provider=openai` 时，只读取 `OPENAI_BASE_URL`。这避免了同时配置多个兼容服务时的冲突。
+
 ## CLI 参数设计
 
 ```python
@@ -156,6 +158,24 @@ python -m agent --no-stream "debug"
 # 限制 turn 数防止无限循环
 python -m agent --max-turns 5 "复杂任务"
 ```
+
+### 同时使用多个兼容服务
+
+```bash
+# 同时配置 Anthropic 和 OpenAI 兼容服务（如百炼）
+export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_BASE_URL=https://dashscope.aliyuncs.com/apps/anthropic/
+export OPENAI_API_KEY=sk-...
+export OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+
+# 使用 Anthropic 后端（Claude 模型）
+python -m agent --provider anthropic --model claude-sonnet-4 "你好"
+
+# 使用 OpenAI 后端（通义千问模型）
+python -m agent --provider openai --model qwen-plus "你好"
+```
+
+> 注意：即使同时设置了 `ANTHROPIC_BASE_URL` 和 `OPENAI_BASE_URL`，系统也会根据 `--provider` 参数自动选择正确的地址。
 
 ### Python 代码中使用
 

@@ -16,6 +16,12 @@ import argparse
 import os
 import sys
 
+# 启用 readline 支持，改善终端输入体验（包括中文输入）
+try:
+    import readline
+except ImportError:
+    pass
+
 from agent.llm import create_llm
 from agent.agent import Agent, StreamEvent
 from agent.tools import get_tools
@@ -384,25 +390,28 @@ def handle_stream_event(event: StreamEvent, verbose: bool = True):
 def run_once(agent: Agent, prompt: str, use_stream: bool):
     """单次问答。"""
     print()
-    if use_stream:
-        # 流式模式，支持 Tool Use
-        for event in agent.stream(prompt):
-            if event.type == "usage":
-                # 流结束，打印 token 用量
-                cache_info = _format_cache_info_from_event(event)
-                print(f"\n--- token 用量: 输入 {event.input_tokens}, 输出 {event.output_tokens}{cache_info} ---")
-            else:
-                handle_stream_event(event, verbose=True)
-        print()
-    else:
-        # 非流式模式
-        response = agent.chat(prompt)
-        print(response.text)
-        # 显示 token 用量，包括 prompt cache 信息
-        cache_info = _format_cache_info(response)
-        print(f"\n--- token 用量: 输入 {response.input_tokens}, 输出 {response.output_tokens}{cache_info} ---")
-        if response.stop_reason and response.stop_reason != "end_turn":
-            print(f"--- 停止原因: {response.stop_reason} ---")
+    try:
+        if use_stream:
+            # 流式模式，支持 Tool Use
+            for event in agent.stream(prompt):
+                if event.type == "usage":
+                    # 流结束，打印 token 用量
+                    cache_info = _format_cache_info_from_event(event)
+                    print(f"\n--- token 用量: 输入 {event.input_tokens}, 输出 {event.output_tokens}{cache_info} ---")
+                else:
+                    handle_stream_event(event, verbose=True)
+            print()
+        else:
+            # 非流式模式
+            response = agent.chat(prompt)
+            print(response.text)
+            # 显示 token 用量，包括 prompt cache 信息
+            cache_info = _format_cache_info(response)
+            print(f"\n--- token 用量: 输入 {response.input_tokens}, 输出 {response.output_tokens}{cache_info} ---")
+            if response.stop_reason and response.stop_reason != "end_turn":
+                print(f"--- 停止原因: {response.stop_reason} ---")
+    except Exception as e:
+        print(f"\n[错误] {e}", file=sys.stderr)
 
 
 def run_repl(agent: Agent, use_stream: bool):

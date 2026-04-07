@@ -18,11 +18,34 @@ Prompt Caching：
 """
 
 import os
+from dataclasses import dataclass
 from typing import Any, Iterator
 
 import anthropic
 
 from .base import BaseLLM, LLMResponse
+
+
+@dataclass
+class StreamEvent:
+    """
+    流式事件，支持文本和 tool_use。
+
+    类型：
+      - "text": 文本片段，text 字段包含内容
+      - "tool_use_start": 开始 tool_use block，name/id/input 字段
+      - "tool_use_delta": tool_use 参数增量，input_delta 字段
+      - "tool_use_end": tool_use block 完成
+      - "message_end": 消息结束，包含 usage 信息
+    """
+    type: str
+    text: str = ""
+    name: str = ""
+    id: str = ""
+    input: dict | None = None
+    input_delta: str = ""
+    usage: dict | None = None
+    stop_reason: str | None = None
 
 # 显式禁用 extended thinking。
 # 某些兼容服务默认开启 thinking，不禁用会导致响应极慢且 content[0] 不是 TextBlock。
@@ -198,3 +221,122 @@ class AnthropicLLM(BaseLLM):
             **self._build_kwargs(messages, system, max_tokens, tools)
         ) as s:
             yield from s.text_stream
+
+    def stream_with_events(
+        self,
+        messages: list[dict],
+        system: str | None = None,
+        max_tokens: int = 8096,
+        tools: list[dict] | None = None,
+    ) -> Iterator[StreamEvent]:
+        """
+        流式调用，返回完整事件流，支持 tool_use。
+
+        与 stream() 不同，这个方法：
+        1. 使用原始流事件（不是 text_stream）
+        2. 支持 tool_use block 的流式接收
+        3. 返回 StreamEvent 对象，调用方需要处理不同类型的事件
+
+        事件序列示例（纯文本）：
+          StreamEvent(type="text", text="Hello")
+          StreamEvent(type="text", text=" world")
+          StreamEvent(type="message_end", usage={...}, stop_reason="end_turn")
+
+        事件序列示例（带 tool_use）：
+          StreamEvent(type="text", text="Let me check")
+          StreamEvent(type="tool_use_start", name="get_current_time", id="tool_123", input={})
+          StreamEvent(type="tool_use_delta", input_delta='{"timezone": "UTC"}')
+          StreamEvent(type="tool_use_end")
+          StreamEvent(type="message_end", usage={...}, stop_reason="tool_use")
+        """
+        kwargs = self._build_kwargs(messages, system, max_tokens, tools)
+
+        # 使用原始流 API（不是 messages.stream() 上下文管理器）
+        # 这样可以获取所有原始事件
+        stream = self._client.messages.create(**kwargs, stream=True)
+
+        # 当前正在构建的 tool_use block
+        current_tool_use = None
+        accumulated_input = ""
+
+        for event in stream:
+            event_type = event.type
+
+            if event_type == "content_block_start":
+                block = event.content_block
+                if block.type == "tool_use":
+                    # 开始新的 tool_use block
+                    current_tool_use = {
+                        "id": block.id,
+                        "name": block.name,
+                        "input": block.input if hasattr(block, 'input') else {},
+                    }
+                    accumulated_input = ""
+                    yield StreamEvent(
+                        type="tool_use_start",
+                        id=block.id,
+                        name=block.name,
+                        input=current_tool_use["input"],
+                    )
+                elif block.type == "text":
+                    # 文本 block 开始，通常没有内容
+                    pass
+
+            elif event_type == "content_block_delta":
+                delta = event.delta
+                if delta.type == "text_delta":
+                    # 文本增量
+                    yield StreamEvent(type="text", text=delta.text)
+                elif delta.type == "input_json_delta":
+                    # tool_use 参数增量
+                    accumulated_input += delta.partial_json
+                    yield StreamEvent(
+                        type="tool_use_delta",
+                        input_delta=delta.partial_json,
+                    )
+
+            elif event_type == "content_block_stop":
+                if current_tool_use is not None:
+                    # tool_use block 完成
+                    # 尝试解析完整的 input JSON
+                    try:
+                        import json
+                        if accumulated_input:
+                            current_tool_use["input"] = json.loads(accumulated_input)
+                    except json.JSONDecodeError:
+                        # JSON 不完整，使用已解析的部分
+                        pass
+
+                    yield StreamEvent(
+                        type="tool_use_end",
+                        id=current_tool_use["id"],
+                        name=current_tool_use["name"],
+                        input=current_tool_use["input"],
+                    )
+                    current_tool_use = None
+                    accumulated_input = ""
+
+            elif event_type == "message_delta":
+                # 消息结束，包含 usage 和 stop_reason
+                usage = None
+                if hasattr(event, 'usage') and event.usage:
+                    usage = {
+                        "input_tokens": getattr(event.usage, 'input_tokens', 0),
+                        "output_tokens": getattr(event.usage, 'output_tokens', 0),
+                        "cache_read_tokens": getattr(event.usage, 'cache_read_input_tokens', 0),
+                        "cache_write_tokens": getattr(event.usage, 'cache_creation_input_tokens', 0),
+                    }
+
+                stop_reason = None
+                if hasattr(event.delta, 'stop_reason'):
+                    stop_reason = event.delta.stop_reason
+
+                yield StreamEvent(
+                    type="message_end",
+                    usage=usage,
+                    stop_reason=stop_reason,
+                )
+
+            elif event_type == "message_start":
+                # 消息开始，可以在这里获取初始 usage
+                pass

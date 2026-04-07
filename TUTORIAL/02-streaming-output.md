@@ -69,7 +69,9 @@ with client.messages.stream(**kwargs) as stream:
         yield text
 ```
 
-`text_stream` 属性自动过滤掉非文本块（如 tool_use、thinking），只返回纯文本。这是 Anthropic API 设计贴心的地方。
+`text_stream` 属性自动过滤掉非文本块（如 thinking），只返回纯文本。这是 Anthropic API 设计贴心的地方。
+
+> **注意**：`text_stream` 也会过滤掉 `tool_use` 块。后续当我们实现 Tool Use 功能时（第 4 篇教程），需要改用原始流事件 API 来处理更复杂的情况。现在先保持简单。
 
 ### OpenAI 的流式 API
 
