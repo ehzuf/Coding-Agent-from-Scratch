@@ -309,19 +309,37 @@ def build_system_prompt(
     # 2. 记忆文件
     memory_files = load_memory_files(cwd)
     if memory_files:
+        # 计算总大小
+        total_size = sum(len(mf.content) for mf in memory_files)
+
+        # 截断保护：优先保留高优先级文件（列表后面的）
+        if total_size > MAX_MEMORY_CHARACTERS:
+            selected_files: list[MemoryFile] = []
+            remaining = MAX_MEMORY_CHARACTERS
+
+            # 从后往前遍历（高优先级优先）
+            for mf in reversed(memory_files):
+                mf_size = len(mf.content)
+                if mf_size <= remaining:
+                    selected_files.append(mf)
+                    remaining -= mf_size
+
+            # 恢复原始顺序（低优先级在前，高优先级在后）
+            selected_files.reverse()
+
+            # 警告被跳过的文件
+            skipped = [mf for mf in memory_files if mf not in selected_files]
+            if skipped:
+                print("[警告] 以下记忆文件因超出上限被跳过：", file=sys.stderr)
+                for mf in skipped:
+                    print(f"  - {mf.source} ({len(mf.content)} 字符)", file=sys.stderr)
+        else:
+            selected_files = memory_files
+
         memory_parts = []
-        total_chars = 0
-
-        for mf in memory_files:
-            # 截断保护
-            remaining = MAX_MEMORY_CHARACTERS - total_chars
-            if remaining <= 0:
-                break
-            content = mf.content[:remaining]
-            total_chars += len(content)
-
+        for mf in selected_files:
             label = f"[{mf.memory_type}] {mf.source}"
-            memory_parts.append(f"### {label}\n\n{content}")
+            memory_parts.append(f"### {label}\n\n{mf.content}")
 
         if memory_parts:
             parts.append(

@@ -1948,3 +1948,31 @@ Step 23  Skills 系统          [高]  ← 依赖 Step 22 MCP
 2. **Step 19 Plan Mode** 紧跟——独立功能无前置依赖，对复杂任务质量提升明显
 3. **Step 20-21 Session Memory → Auto-Memory** 按依赖顺序——先做会话内记忆，再做跨会话记忆
 4. **Step 22-23 MCP → Skills** 放最后——复杂度最高，且 Skills 依赖 MCP 提供外部 Skill 来源
+
+---
+
+## 未来规划
+
+以下功能尚未实现，欢迎社区贡献：
+
+### TodoWriteTool（任务清单）
+
+**对应 Claude Code 源码：** `tools/TodoWriteTool/`
+
+**功能描述：**
+- 将 Plan Mode 的方案分解为结构化的任务清单（todo list）
+- 每个任务有状态：`pending` / `in_progress` / `completed`
+- Agent 执行时更新任务状态，用户可实时看到进度
+- 支持增删改查任务，动态调整计划
+
+**与 Plan Mode 的关系：**
+- Plan Mode 负责"规划阶段"（只读分析、制定方案）
+- TodoWriteTool 负责"执行阶段"（将方案拆解为可跟踪的任务）
+- 当前实现：Plan Mode 的方案作为文本保留在对话中，Agent 自行管理执行顺序
+- 完整实现：exit_plan_mode 后，Agent 调用 TodoWriteTool 创建任务清单，逐步执行
+
+**实现要点：**
+- `TodoWriteTool`：更新整个任务列表（覆盖写）
+- `TaskListTool` / `TaskUpdateTool`：查询和更新单个任务（可选）
+- 任务状态存储在 Agent 实例中（或持久化到会话）
+- CLI 显示当前任务列表（类似 `/memory` 命令）

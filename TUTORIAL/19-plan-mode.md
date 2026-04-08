@@ -186,11 +186,13 @@ if _enable_agent_tool:
 | 权限请求 | 方案中声明需要的权限 | 不支持（简化） |
 | 面试阶段 | 可选的 interview phase | 不支持（简化） |
 | 只读判断 | 工具自带 isReadOnly() 方法 | 全局白名单 + bash 前缀匹配 |
+| 任务跟踪 | TodoWriteTool 管理任务清单 | 不支持（简化） |
 
 我们的简化：
 - **不写文件** —— 方案直接在 tool_result 中，作为消息历史的一部分。好处是方案天然参与后续对话上下文
 - **不需要审批** —— Agent 自己决定何时规划、何时执行。实际使用中 Agent 的方案质量通常足够好
 - **白名单而非接口** —— Claude Code 每个工具有 `isReadOnly()` 方法，我们用全局白名单简化，不需要改动每个工具类
+- **无 TodoWriteTool** —— Claude Code 还有 `TodoWriteTool` 将方案分解为可跟踪的任务清单。本教程仅实现核心的"权限控制"概念，任务跟踪依赖 Agent 自行管理
 
 ---
 

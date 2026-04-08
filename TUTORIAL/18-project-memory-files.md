@@ -73,9 +73,14 @@ def find_agents_md(start_dir):
 
 ### 优先级与加载顺序
 
-Claude Code 的设计：**后加载的优先级更高**。LLM 对靠后的内容给予更多注意。
+Claude Code 的设计：**后加载的优先级更高**（LLM 对 prompt 中靠后的内容给予更多注意）。
 
-所以加载顺序是：用户级 → 项目级（从根到 cwd）→ 本地级。本地配置最后加载，优先级最高。
+分层加载顺序（优先级从低到高）：
+```
+用户级 → 项目级（从根目录到 cwd）→ 本地级
+```
+
+越靠近当前工作目录的配置越晚加载，优先级越高。本地级（Local）最后加载，优先级最高。
 
 ---
 
@@ -198,7 +203,13 @@ def _process_memory_file(file_path, memory_type, processed, depth=0):
     return result
 ```
 
-注意 include 的文件排在引用它的文件**后面**——Claude Code 的设计是父文件优先于子文件（先加载的内容在 prompt 中更靠前）。
+**@include 的优先级规则**：
+- 主文件（引用者）先加载 → 排在前面 → **优先级更高**
+- 被引用的文件后加载 → 排在后面 → **优先级更低**
+
+这与分层加载的"后加载优先级更高"似乎矛盾，但实际上是两种不同的场景：
+- **分层加载**：子目录的配置应该覆盖父目录的配置（后加载优先）
+- **@include**：主文件是"入口"，被引用的文件是"补充说明"（主文件优先）
 
 安全措施：
 - **最大深度 5** —— 防止无限递归
@@ -236,27 +247,55 @@ def build_system_prompt(base_system=None, cwd=".", include_date=True):
 
     memory_files = load_memory_files(cwd)
     if memory_files:
+        # 计算总大小
+        total_size = sum(len(mf.content) for mf in memory_files)
+
+        # 截断保护：优先保留高优先级文件（列表后面的）
+        if total_size > MAX_MEMORY_CHARACTERS:
+            selected_files = []
+            remaining = MAX_MEMORY_CHARACTERS
+
+            # 从后往前遍历（高优先级优先）
+            for mf in reversed(memory_files):
+                mf_size = len(mf.content)
+                if mf_size <= remaining:
+                    selected_files.append(mf)
+                    remaining -= mf_size
+
+            # 恢复原始顺序（低优先级在前，高优先级在后）
+            selected_files.reverse()
+
+            # 警告被跳过的文件
+            skipped = [mf for mf in memory_files if mf not in selected_files]
+            if skipped:
+                print("[警告] 以下记忆文件因超出上限被跳过：", file=sys.stderr)
+                for mf in skipped:
+                    print(f"  - {mf.source} ({len(mf.content)} 字符)", file=sys.stderr)
+        else:
+            selected_files = memory_files
+
         memory_parts = []
-        total_chars = 0
-
-        for mf in memory_files:
-            remaining = MAX_MEMORY_CHARACTERS - total_chars
-            if remaining <= 0:
-                break
-            content = mf.content[:remaining]
-            total_chars += len(content)
+        for mf in selected_files:
             label = f"[{mf.memory_type}] {mf.source}"
-            memory_parts.append(f"### {label}\n\n{content}")
+            memory_parts.append(f"### {label}\n\n{mf.content}")
 
-        parts.append(
-            "## 项目规范\n\n"
-            "以下是项目的编码规范和指令，请严格遵守。\n\n"
-            + "\n\n".join(memory_parts)
-        )
+        if memory_parts:
+            parts.append(
+                "## 项目规范\n\n"
+                "以下是项目的编码规范和指令，请严格遵守。\n\n"
+                + "\n\n".join(memory_parts)
+            )
 
     # 上下文信息（日期、工作目录）...
     return "\n\n".join(parts)
 ```
+
+> **与 Claude Code 的差异**：Claude Code 的 `MAX_MEMORY_CHARACTER_COUNT` 仅用于检测和警告大文件，
+> 不会截断或跳过任何文件（依赖 LLM 的 context window 足够大）。
+> 
+> 我们的教学实现采用**优先保留高优先级文件**的策略：当总大小超出上限时，从后往前选择文件，
+> 确保高优先级的本地配置和靠近 cwd 的项目配置被保留。这是一种更保守的防御性设计，
+> 同时通过 stderr 输出警告，让用户知道哪些文件被跳过了。
 
 `MAX_MEMORY_CHARACTERS = 40000` 是截断保护。记忆文件可能很多，不能无限制地塞进 system prompt。40000 字符大约 10000-13000 tokens，是合理的上限。
 
