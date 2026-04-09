@@ -361,6 +361,8 @@ LLM 会自动调用 `skill` 工具执行 `code-review` Skill，fork 一个只能
 | **适合场景** | 固定工作流（审查、测试、部署） | 动态子任务分解 | 数据库、API、搜索 |
 | **技术门槛** | 写 Markdown | 无需代码 | 运行 MCP Server |
 
+> **与 Claude Code 的差异**：Claude Code 的 Skill 内容作为 **user message** 传入子 Agent，子 Agent 保持原有 system prompt；我们的实现将 Skill 作为 **system prompt** 传入。这是教学项目的简化设计，更直观易懂。
+
 Skill 的独特优势：
 1. **零代码**——写 Markdown 就是创建工具
 2. **可约束**——`allowed_tools` 限制子 Agent 能力
