@@ -291,7 +291,7 @@ SessionMemory 复用主 Agent 的 LLM 实例，不需要额外配置。
 
 ## 序列化与会话恢复
 
-SessionMemory 支持序列化，可以与 Step 16 的会话持久化配合：
+SessionMemory 支持序列化，可以与会话持久化配合：
 
 ```python
 def to_dict(self) -> dict:

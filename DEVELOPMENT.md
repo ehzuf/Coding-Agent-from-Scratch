@@ -1905,8 +1905,8 @@ REPL 新增命令：
 - **SkillDefinition 数据类**：name、description、prompt、source、allowed_tools、context（fork/inline）
 - **Frontmatter 解析**（`_parse_frontmatter()`）：解析 markdown 文件的 YAML-like frontmatter，支持列表格式 `[a, b, c]`
 - **Skill 加载**（`load_skills()`）：
-  - 用户级：`~/.coding-agent/skills/*.md`
-  - 项目级：`.coding-agent/skills/*.md`（同名覆盖用户级）
+  - 用户级：`~/.coding-agent/skills/*/SKILL.md`
+  - 项目级：`.coding-agent/skills/*/SKILL.md`（同名覆盖用户级）
 - **SkillTool**：Agent 通过工具调用执行 Skill
   - 名称固定为 `skill`，输入参数包含 `name`（Skill 名称）和 `args`（可选参数）
   - 执行方式：fork 子 Agent，使用 Skill 的 prompt 作为系统提示

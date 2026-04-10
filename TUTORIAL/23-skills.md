@@ -46,11 +46,9 @@ Skill 文件按两级目录加载：
     SKILL.md
 ```
 
-> **注意**：Claude Code 使用目录格式 `skills/name/SKILL.md`，每个 Skill 是一个目录。我们的教学实现做了简化，也支持直接使用 `skills/name.md` 文件格式，降低使用门槛。
-
 加载规则：
-1. 先加载用户级 `~/.coding-agent/skills/*/SKILL.md`（或 `*.md`）
-2. 再加载项目级 `.coding-agent/skills/*/SKILL.md`（或 `*.md`）
+1. 先加载用户级 `~/.coding-agent/skills/*/SKILL.md`
+2. 再加载项目级 `.coding-agent/skills/*/SKILL.md`
 3. **同名覆盖**：项目级的 Skill 覆盖用户级同名 Skill
 
 这样可以在项目中定制特定的工作流，同时共享全局通用 Skill。
@@ -59,7 +57,7 @@ Skill 文件按两级目录加载：
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `name` | string | 否 | Skill 名称（默认取文件名） |
+| `name` | string | 否 | Skill 名称（默认取目录名） |
 | `description` | string | 否 | 描述（展示给 LLM 和用户） |
 | `allowed_tools` | list | 否 | 子 Agent 可用工具白名单 |
 | `context` | string | 否 | `fork`（默认）或 `inline` |
@@ -136,7 +134,7 @@ def load_skills(cwd: str = ".") -> list[SkillDefinition]:
     return list(skills.values())
 ```
 
-`_load_skills_from_dir` 遍历目录中的 `.md` 文件，解析 frontmatter 和 body，构建 `SkillDefinition`：
+`_load_skills_from_dir` 遍历目录中的子目录，加载 `SKILL.md` 文件，解析 frontmatter 和 body，构建 `SkillDefinition`：
 
 ```python
 @dataclass
@@ -307,7 +305,7 @@ if prompt == "/skills":
 
 ### 创建 Skill
 
-在 `~/.coding-agent/skills/` 下创建 `code-review.md`：
+在 `~/.coding-agent/skills/code-review/` 下创建 `SKILL.md`：
 
 ```markdown
 ---
@@ -346,7 +344,7 @@ LLM 会自动调用 `skill` 工具执行 `code-review` Skill，fork 一个只能
 [2] 你: /skills
 可用 Skill:
   code-review — 审查代码变更并给出建议 (工具: ['read', 'glob', 'grep', 'bash'])
-    来源: [user] /Users/xxx/.coding-agent/skills/code-review.md
+    来源: [user] /Users/xxx/.coding-agent/skills/code-review/SKILL.md
 ```
 
 ## Skill vs Agent Tool vs MCP Tool
@@ -383,9 +381,9 @@ LLM 选择调用 → fork 子 Agent → 工具过滤 → 执行 Skill prompt
 
 这个设计让用户无需写 Python 代码就能创建可复用的 Agent 工作流。Frontmatter 提供了元数据声明能力，`allowed_tools` 提供了安全约束，fork 执行提供了上下文隔离。
 
-至此，Step 18-23 全部完成。第二阶段的 6 个功能覆盖了：
-- **项目感知**：分层记忆文件（Step 18）+ 跨会话记忆（Step 21）
-- **智能记忆**：会话记忆（Step 20）+ 自动记忆提取（Step 21）
-- **可扩展性**：MCP 外部工具（Step 22）+ 自定义 Skills（Step 23）+ 规划模式（Step 19）
+至此，项目记忆文件、Plan Mode、Session Memory、Auto-Memory、MCP Client、Skills 六个功能全部完成，覆盖了：
+- **项目感知**：分层记忆文件 + 跨会话记忆
+- **智能记忆**：会话记忆 + 自动记忆提取
+- **可扩展性**：MCP 外部工具 + 自定义 Skills + 规划模式
 
 Agent 已经具备了一个完整 Coding Agent 的核心能力。

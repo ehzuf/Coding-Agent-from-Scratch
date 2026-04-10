@@ -9,7 +9,7 @@ Skills 系统 —— 自定义技能（markdown prompt + frontmatter）
   - SkillTool：Agent 通过工具调用执行 Skill（fork 子 Agent）
   - Frontmatter 字段：name, description, allowed_tools, context（inline/fork）
 
-Skill 文件格式示例（~/.coding-agent/skills/code-review.md）：
+Skill 文件格式示例（~/.coding-agent/skills/code-review/SKILL.md）：
   ---
   name: code-review
   description: 审查代码变更并给出建议
@@ -98,8 +98,8 @@ def load_skills(cwd: str = ".") -> list[SkillDefinition]:
     从所有来源加载 Skill 定义。
 
     来源（按优先级）：
-      1. 用户级：~/.coding-agent/skills/*.md
-      2. 项目级：.coding-agent/skills/*.md（同名覆盖用户级）
+      1. 用户级：~/.coding-agent/skills/*/SKILL.md
+      2. 项目级：.coding-agent/skills/*/SKILL.md（同名覆盖用户级）
 
     Returns:
         SkillDefinition 列表
@@ -122,9 +122,9 @@ def _load_skills_from_dir(
     source_type: str,
     skills: dict[str, SkillDefinition],
 ) -> None:
-    """从目录加载 Skill 文件。支持两种格式：
-    - 文件格式：skills/name.md
-    - 目录格式：skills/name/SKILL.md（Claude Code 格式）
+    """从目录加载 Skill 文件。
+
+    格式：skills/name/SKILL.md（与 Claude Code 一致）
     """
     if not os.path.isdir(directory):
         return
@@ -137,16 +137,6 @@ def _load_skills_from_dir(
             skill_file = os.path.join(entry_path, "SKILL.md")
             if os.path.isfile(skill_file):
                 _load_single_skill(skill_file, entry, source_type, skills)
-            continue
-
-        # 文件格式：skills/name.md
-        if not entry.endswith(".md"):
-            continue
-        if not os.path.isfile(entry_path):
-            continue
-
-        default_name = entry.replace(".md", "")
-        _load_single_skill(entry_path, default_name, source_type, skills)
 
 
 def _load_single_skill(
