@@ -23,3 +23,4 @@ __pycache__/
 
 # TypeScript 参考实现（本地参考，不纳入版本控制）
 reference/
+hermes-agent
