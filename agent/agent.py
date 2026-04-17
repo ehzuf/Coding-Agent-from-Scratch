@@ -44,6 +44,7 @@ from agent.session import SessionManager
 from agent.hooks import HookManager
 from agent.session_memory import SessionMemory
 from agent.auto_memory import AutoMemory
+from agent.skill_evolution import SkillEvolution
 from agent.tools.plan_mode import (
     EnterPlanModeTool,
     ExitPlanModeTool,
@@ -131,6 +132,7 @@ class Agent:
         hook_manager: HookManager | None = None,
         session_memory: SessionMemory | None = None,
         auto_memory: AutoMemory | None = None,
+        skill_evolution: SkillEvolution | None = None,
         _enable_agent_tool: bool = True,
     ):
         """
@@ -169,6 +171,7 @@ class Agent:
         self.hook_manager = hook_manager
         self.session_memory = session_memory
         self.auto_memory = auto_memory
+        self.skill_evolution = skill_evolution
 
         # Plan Mode 状态
         self.plan_mode = False
@@ -618,10 +621,16 @@ class Agent:
             if not response.has_tool_use:
                 # Auto-Memory：对话结束时提取持久性记忆
                 self._maybe_extract_memories()
+                # Skill 自进化：对话结束时审查并沉淀技能
+                self._maybe_evolve_skills()
                 return response
 
             # 累加工具调用次数
             self._tool_use_count += len(response.tool_uses)
+
+            # Skill 自进化：记录工具调用迭代
+            if self.skill_evolution:
+                self.skill_evolution.tick()
 
             # 执行所有工具调用（支持并发）
             results = self._execute_tools(response.tool_uses)
@@ -771,10 +780,16 @@ class Agent:
                             final_response = response
                             # Auto-Memory：对话结束时提取持久性记忆
                             self._maybe_extract_memories()
+                            # Skill 自进化：对话结束时审查并沉淀技能
+                            self._maybe_evolve_skills()
                             break
 
                         # 有 tool_use，执行工具
                         self._tool_use_count += len(current_tool_uses)
+
+                        # Skill 自进化：记录工具调用迭代
+                        if self.skill_evolution:
+                            self.skill_evolution.tick()
 
                         # 执行所有工具调用（支持并发）
                         batches = self._partition_tool_calls(current_tool_uses)
@@ -848,10 +863,16 @@ class Agent:
                 final_response = response
                 # Auto-Memory：对话结束时提取持久性记忆
                 self._maybe_extract_memories()
+                # Skill 自进化：对话结束时审查并沉淀技能
+                self._maybe_evolve_skills()
                 break
 
             # 累加工具调用次数
             self._tool_use_count += len(response.tool_uses)
+
+            # Skill 自进化：记录工具调用迭代
+            if self.skill_evolution:
+                self.skill_evolution.tick()
 
             # 执行所有工具调用（支持并发）
             batches = self._partition_tool_calls(response.tool_uses)
@@ -936,6 +957,17 @@ class Agent:
             return
         try:
             self.auto_memory.extract_and_save(self.messages)
+        except Exception:
+            pass
+
+    def _maybe_evolve_skills(self) -> None:
+        """对话结束时尝试进化 Skill。静默执行，失败不影响主流程。"""
+        if not self.skill_evolution:
+            return
+        try:
+            results = self.skill_evolution.maybe_evolve(self.messages)
+            for r in results:
+                print(f"  \U0001f4a1 {r}")
         except Exception:
             pass
 

@@ -79,8 +79,9 @@
 | 21 | [跨会话记忆](21-auto-memory.md) | 记住你的偏好，下次还能用 |
 | 22 | [MCP Client](22-mcp-client.md) | 接入 MCP 协议，连接外部工具生态 |
 | 23 | [Skills 系统](23-skills.md) | 写个 Markdown 就能定义可复用的工作流 |
+| 24 | [Skill 自进化](24-skill-evolution.md) | 复杂任务后自动沉淀经验，越用越聪明 |
 
-到这里，Agent 具备了项目感知、长期记忆和自定义扩展能力——一个完整的 Coding Agent。
+到这里，Agent 具备了项目感知、长期记忆、自定义扩展和自我进化能力——一个完整的 Coding Agent。
 
 ---
 ## 最后

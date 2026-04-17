@@ -78,6 +78,16 @@
 
 ---
 
+## 七、模型训练
+
+> 用 Agent 训练更好的 Agent
+
+| 标题 | 讲了什么 |
+|---|---|
+| [RL 训练闭环](09-rl-training.md) | 批量轨迹生成、ShareGPT 格式、轨迹压缩、GRPO+LoRA 训练编排、WandB 监控 |
+
+---
+
 ## 与基础系列的关系
 
 基础系列从零搭建了 Agent 的核心：对话、工具调用、多 Agent、记忆、Skills。

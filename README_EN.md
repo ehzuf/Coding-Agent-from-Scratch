@@ -1,10 +1,10 @@
 # Coding Agent from Scratch
 
-> **512,000 lines of TypeScript → 7,500 lines of Python. 23 tutorials, 7,500+ lines of walkthrough — demystifying every core mechanism of a Coding Agent, step by step.**
+> **512,000 lines of TypeScript → 7,500 lines of Python. Two tutorial series — demystifying every core mechanism of a Coding Agent, then advancing to a personal assistant.**
 
 [中文](README.md)
 
-[Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) ships with 512,000+ lines of TypeScript across ~1,900 source files. This project re-implements its core mechanisms in **~7,500 lines of Python** (less than 1.5% of the original codebase), with 23 tutorials explaining the *why* behind every design decision.
+[Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) ships with 512,000+ lines of TypeScript across ~1,900 source files. This project re-implements its core mechanisms in **~7,500 lines of Python** (less than 1.5% of the original codebase), with two tutorial series explaining the *why* behind every design decision.
 
 ## Why This Project
 
@@ -24,7 +24,8 @@ One article per mechanism, with complete runnable code.
 | Language | TypeScript | Python |
 | Lines of Code | 512,000+ | **~7,500** |
 | Source Files | ~1,900 | **~30** |
-| Tutorials | — | **23 articles / 7,500+ lines** |
+| Foundation Tutorials | — | **24 articles** |
+| Advanced Tutorials | — | **9 articles** (referencing [Hermes Agent](https://github.com/nousresearch/hermes-agent)) |
 
 ## Architecture
 
@@ -80,6 +81,23 @@ From "it works" to "it works well" — project awareness, memory, and extensibil
 | 21 | Auto-Memory — Cross-session Persistent Memory | [21-auto-memory.md](TUTORIAL/21-auto-memory.md) |
 | 22 | MCP Client — Connect to External Tool Servers | [22-mcp-client.md](TUTORIAL/22-mcp-client.md) |
 | 23 | Skills System — Markdown-defined Reusable Workflows | [23-skills.md](TUTORIAL/23-skills.md) |
+| 24 | Skill Evolution — Auto-extract Experience After Complex Tasks | [24-skill-evolution.md](TUTORIAL/24-skill-evolution.md) |
+
+### Advanced Series: From Coding Agent to Personal Assistant
+
+Referencing [Hermes Agent](https://github.com/nousresearch/hermes-agent), dissecting the key capability upgrades from a coding assistant to an intelligent personal assistant.
+
+| # | Topic | Tutorial |
+|---|-------|----------|
+| 01 | Context References — @file/@diff/@url Syntax | [01-context-references.md](TUTORIAL-ADVANCED/01-context-references.md) |
+| 02 | Smart Model Routing — Auto-downgrade Simple Queries | [02-smart-routing.md](TUTORIAL-ADVANCED/02-smart-routing.md) |
+| 03 | Cost Tracking & Usage Insights — Token Normalization | [03-usage-insights.md](TUTORIAL-ADVANCED/03-usage-insights.md) |
+| 04 | Data Redaction — 40+ Sensitive Pattern Detection | [04-redaction.md](TUTORIAL-ADVANCED/04-redaction.md) |
+| 05 | Skill Auto-Generation — Background Agent Periodic Extraction | [05-skill-auto-generation.md](TUTORIAL-ADVANCED/05-skill-auto-generation.md) |
+| 06 | SQLite + Full-Text Search — WAL Concurrency + FTS5 | [06-sqlite-fts.md](TUTORIAL-ADVANCED/06-sqlite-fts.md) |
+| 07 | Multi-Platform Gateway — Telegram/Discord/Slack Adapters | [07-gateway.md](TUTORIAL-ADVANCED/07-gateway.md) |
+| 08 | Cron System — Built-in Task Scheduler | [08-cron-system.md](TUTORIAL-ADVANCED/08-cron-system.md) |
+| 09 | RL Training Loop — Trajectory Generation + GRPO Orchestration | [09-rl-training.md](TUTORIAL-ADVANCED/09-rl-training.md) |
 
 ## Project Structure
 
@@ -149,6 +167,8 @@ python -m agent
 **Memory system:** Read [20 Session Memory](TUTORIAL/20-session-memory.md) → [21 Auto-Memory](TUTORIAL/21-auto-memory.md).
 
 **MCP and Skills:** Read [22](TUTORIAL/22-mcp-client.md) and [23](TUTORIAL/23-skills.md).
+
+**Advanced series:** See [TUTORIAL-ADVANCED](TUTORIAL-ADVANCED/00-overview.md), covering smart routing, cost tracking, data redaction, skill auto-generation, multi-platform gateway, RL training, and more.
 
 ## Tech Stack
 

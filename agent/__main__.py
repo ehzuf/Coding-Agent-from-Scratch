@@ -39,6 +39,7 @@ from agent.session_memory import SessionMemory
 from agent.auto_memory import AutoMemory
 from agent.mcp_client import MCPManager
 from agent.skills import SkillManager
+from agent.skill_evolution import SkillEvolution
 
 def build_agent(args) -> tuple[Agent, "Config"]:
     """根据配置构建 Agent 实例，返回 (agent, config) 元组。"""
@@ -151,6 +152,9 @@ def build_agent(args) -> tuple[Agent, "Config"]:
     if memory_prompt:
         system_prompt = system_prompt + "\n\n" + memory_prompt if system_prompt else memory_prompt
 
+    # Skill 自进化
+    skill_evolution = SkillEvolution(llm=llm)
+
     # 创建 Agent，传入所有配置
     agent = Agent(
         llm=llm,
@@ -168,6 +172,7 @@ def build_agent(args) -> tuple[Agent, "Config"]:
         hook_manager=hook_manager,
         session_memory=session_memory,
         auto_memory=auto_memory,
+        skill_evolution=skill_evolution,
     )
 
     # 存储 MCP 管理器引用（用于 REPL /mcp 命令和关闭）
@@ -424,7 +429,7 @@ def run_repl(agent: Agent, use_stream: bool):
     - /exit /quit   → 退出
     - Ctrl+C        → 退出
     """
-    print("\n输入问题开始对话，/clear 清空历史，/cache 缓存分析，/session 会话信息，/hooks 查看 Hooks，/memory 查看记忆，/mcp 查看 MCP，/skills 查看技能，/exit 退出\n")
+    print("\n输入问题开始对话，/clear 清空历史，/cache 缓存分析，/session 会话信息，/hooks 查看 Hooks，/memory 查看记忆，/mcp 查看 MCP，/skills 查看技能，/evolve 强制技能审查，/exit 退出\n")
 
     while True:
         # 显示轮次提示符
@@ -503,6 +508,20 @@ def run_repl(agent: Agent, use_stream: bool):
                 print(f"\n{skill_mgr.get_summary()}\n")
             else:
                 print("\n暂无可用 Skill。可在 ~/.coding-agent/skills/ 或 .coding-agent/skills/ 中添加 Skill 文件。\n")
+            continue
+
+        if prompt == "/evolve":
+            if agent.skill_evolution:
+                # 临时设置计数器为阈值，强制触发
+                agent.skill_evolution._counter = agent.skill_evolution.threshold
+                results = agent.skill_evolution.maybe_evolve(agent.messages)
+                if results:
+                    for r in results:
+                        print(f"  \U0001f4a1 {r}")
+                else:
+                    print("\n当前对话没有值得沉淀的 Skill。\n")
+            else:
+                print("\nSkill 自进化未启用。\n")
             continue
 
         # 正常对话

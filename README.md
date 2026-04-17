@@ -1,10 +1,10 @@
 # Coding Agent from Scratch
 
-> **512,000 行 TypeScript → 7,500 行 Python。23 篇教程，7,500+ 行讲解，从零拆解 Coding Agent 的每一个核心机制。**
+> **512,000 行 TypeScript → 7,500 行 Python。两套教程系列，从零拆解 Coding Agent 的每一个核心机制，再进阶到个人助理。**
 
 [English](README_EN.md)
 
-[Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) 有 512,000+ 行 TypeScript、近 1,900 个源文件。这个项目用 **~7,500 行 Python**（不到原版 1.5% 的代码量）重新实现了它的核心功能，并用 23 篇教程逐步拆解每一个设计决策背后的 **为什么**。
+[Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) 有 512,000+ 行 TypeScript、近 1,900 个源文件。这个项目用 **~7,500 行 Python**（不到原版 1.5% 的代码量）重新实现了它的核心功能，并用两套教程逐步拆解每一个设计决策背后的 **为什么**。
 
 ## 为什么做这个项目
 
@@ -24,7 +24,8 @@
 | 语言 | TypeScript | Python |
 | 代码行数 | 512,000+ | **~7,500** |
 | 源文件数 | ~1,900 | **~30** |
-| 教程 | — | **23 篇 / 7,500+ 行** |
+| 基础教程 | — | **24 篇** |
+| 进阶教程 | — | **9 篇**（以 [Hermes Agent](https://github.com/nousresearch/hermes-agent) 为参考） |
 
 ## 整体架构
 
@@ -80,6 +81,23 @@ Agent (消息历史 + Tool Use 循环)
 | 21 | Auto-Memory — 跨会话持久记忆 | [21-auto-memory.md](TUTORIAL/21-auto-memory.md) |
 | 22 | MCP Client — 连接外部工具服务器 | [22-mcp-client.md](TUTORIAL/22-mcp-client.md) |
 | 23 | Skills 系统 — Markdown 定义可复用工作流 | [23-skills.md](TUTORIAL/23-skills.md) |
+| 24 | Skill 自进化 — 复杂任务后自动沉淀经验 | [24-skill-evolution.md](TUTORIAL/24-skill-evolution.md) |
+
+### 进阶系列：从 Coding Agent 到个人助理
+
+以 [Hermes Agent](https://github.com/nousresearch/hermes-agent) 为参考，拆解从编程助手到智能个人助理的关键能力升级。
+
+| # | 主题 | 教程 |
+|---|------|------|
+| 01 | 上下文引用系统 — @file/@diff/@url 语法 | [01-context-references.md](TUTORIAL-ADVANCED/01-context-references.md) |
+| 02 | 智能模型路由 — 简单问题自动降级 | [02-smart-routing.md](TUTORIAL-ADVANCED/02-smart-routing.md) |
+| 03 | 成本追踪与使用洞察 — token 归一化 + 精确计算 | [03-usage-insights.md](TUTORIAL-ADVANCED/03-usage-insights.md) |
+| 04 | 信息脱敏 — 40+ 敏感模式自动识别 | [04-redaction.md](TUTORIAL-ADVANCED/04-redaction.md) |
+| 05 | 技能自生成 — 后台审查 Agent 周期性提取 Skill | [05-skill-auto-generation.md](TUTORIAL-ADVANCED/05-skill-auto-generation.md) |
+| 06 | SQLite + 全文搜索 — WAL 并发 + FTS5 | [06-sqlite-fts.md](TUTORIAL-ADVANCED/06-sqlite-fts.md) |
+| 07 | 多平台消息网关 — Telegram/Discord/Slack 适配 | [07-gateway.md](TUTORIAL-ADVANCED/07-gateway.md) |
+| 08 | 定时任务系统 — 内置 Cron 调度器 | [08-cron-system.md](TUTORIAL-ADVANCED/08-cron-system.md) |
+| 09 | RL 训练闭环 — 轨迹生成 + GRPO 训练编排 | [09-rl-training.md](TUTORIAL-ADVANCED/09-rl-training.md) |
 
 ## 项目结构
 
@@ -149,6 +167,8 @@ python -m agent
 **记忆系统：** 看 [20 Session Memory](TUTORIAL/20-session-memory.md) → [21 Auto-Memory](TUTORIAL/21-auto-memory.md)。
 
 **MCP 和 Skills：** 看 [22](TUTORIAL/22-mcp-client.md) 和 [23](TUTORIAL/23-skills.md)。
+
+**进阶系列：** 看 [TUTORIAL-ADVANCED](TUTORIAL-ADVANCED/00-overview.md)，涵盖智能路由、成本追踪、信息脱敏、技能自生成、多平台网关、RL 训练等。
 
 ## 技术栈
 
