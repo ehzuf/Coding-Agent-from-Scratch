@@ -120,6 +120,7 @@ class SessionDB:
         self._conn = sqlite3.connect(
             str(self.db_path),
             check_same_thread=False,  # 允许跨线程使用
+            isolation_level=None,     # 关闭 Python 自动 BEGIN，手动控制事务
         )
         self._conn.row_factory = sqlite3.Row
         
@@ -183,6 +184,8 @@ def _try_wal_checkpoint(self):
 重试时的**随机抖动**（20-150ms）很重要——如果多个线程以固定间隔重试，它们可能会永远撞在一起（确定性退避的"队列效应"）。随机化打破了这个模式。
 
 `BEGIN IMMEDIATE` 而不是默认的 `BEGIN`——立即获取写锁，避免在事务中间才发现锁冲突。
+
+> **注意**：Python `sqlite3` 默认 `isolation_level=""`，会在 DML 前自动 `BEGIN`，与手写的 `BEGIN IMMEDIATE` 冲突报 `cannot start a transaction within a transaction`。上面 `connect` 中设 `isolation_level=None` 切换到 autocommit，交由我们显式控制事务边界。
 
 ## CRUD 操作
 

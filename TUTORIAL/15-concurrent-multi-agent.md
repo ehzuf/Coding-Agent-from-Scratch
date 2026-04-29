@@ -1,4 +1,4 @@
-# 从零实现 Coding Agent（十五）：Coordinator 模式
+# 从零实现 Coding Agent（十五）：并发多 Agent 编排（Coordinator 模式）
 
 在前面几篇中，我们实现了子 Agent（可以委托子任务）、Agent 间通信（可以追问子 Agent）、并发工具执行（多个工具同时运行）。这些能力组合在一起，已经让 LLM 可以同时启动多个子 Agent 并行处理子任务。
 

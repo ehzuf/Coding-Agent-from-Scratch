@@ -399,7 +399,7 @@ class GrepTool(Tool):
         else:
             for root, dirs, files in os.walk(path):
                 for f in files:
-                    if include and not f.endswith(include.lstrip("*.")):
+                    if include and not f.endswith(include.removeprefix("*.")):
                         continue
                     files_to_search.append(os.path.join(root, f))
 

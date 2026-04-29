@@ -470,13 +470,8 @@ def _check_path_safety(path):
     # 检查敏感目录
     for sensitive_dir in _SENSITIVE_DIRS:
         sensitive_path = home / sensitive_dir
-        try:
-            path.relative_to(sensitive_path)
+        if path.is_relative_to(sensitive_path):
             raise ValueError(f"path is inside sensitive directory: {sensitive_dir}")
-        except ValueError as e:
-            if "sensitive directory" in str(e):
-                raise
-            continue  # 不在这个目录下，继续检查
 
     # 检查敏感文件
     for sensitive_file in _SENSITIVE_FILES:

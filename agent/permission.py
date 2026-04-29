@@ -49,6 +49,10 @@ class PermissionRule:
     pattern: str             # 匹配模式，如 "git *" 或 "*"
     mode: PermissionMode     # 权限模式
 
+    def __post_init__(self) -> None:
+        # 工具名统一小写，避免配置写 "Bash(...)" 而注册名是 "bash" 时规则静默失效
+        self.tool_name = self.tool_name.lower()
+
     def matches(self, tool_name: str, argument: str) -> bool:
         """
         检查规则是否匹配。
@@ -60,7 +64,7 @@ class PermissionRule:
         Returns:
             是否匹配
         """
-        if tool_name != self.tool_name:
+        if tool_name.lower() != self.tool_name:
             return False
 
         # 使用 fnmatch 进行通配符匹配
@@ -210,7 +214,22 @@ class PermissionManager:
         if response in ("y", "yes"):
             return True
         elif response == "a":
-            # yes to all - 可以添加临时规则
+            # yes to all - 追加一条会话级 allow 规则，下次同工具调用不再询问
+            # 注意：只写入内存中的 self.config.allow_rules，不做持久化
+            already = any(
+                r.tool_name == tool_name
+                and r.pattern == "*"
+                and r.mode == PermissionMode.ALLOW
+                for r in self.config.allow_rules
+            )
+            if not already:
+                self.config.allow_rules.append(
+                    PermissionRule(
+                        tool_name=tool_name,
+                        pattern="*",
+                        mode=PermissionMode.ALLOW,
+                    )
+                )
             return True
         else:
             return False

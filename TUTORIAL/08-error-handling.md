@@ -84,6 +84,11 @@ import time
 import random
 from functools import wraps
 
+
+class RetryError(Exception):
+    """重试耗尽后抛出的异常。"""
+
+
 def with_retry(
     max_retries: int = 3,
     initial_delay: float = 1.0,

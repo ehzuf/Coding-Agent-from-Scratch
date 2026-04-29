@@ -907,7 +907,7 @@ class CronScheduler:
 
             # 交付判断
             should_deliver = bool(response) and success
-            if should_deliver and SILENT_MARKER in response.strip().upper():
+            if should_deliver and response.strip().upper().startswith(SILENT_MARKER):
                 should_deliver = False  # Agent 说无事可报
 
             if should_deliver and job.get("deliver", "local") != "local":

@@ -146,9 +146,16 @@ def estimate_cost(usage, provider, model):
     pricing = _PRICING_TABLE.get((provider, model))
 
     if pricing is None:
-        # 尝试模糊匹配（去掉日期后缀）
+        # 尝试模糊匹配（去掉形如 -YYYYMMDD 的日期后缀）
         for (p, m), price in _PRICING_TABLE.items():
-            if p == provider and model.startswith(m.split("-")[0]):
+            if p != provider:
+                continue
+            stem = m
+            if "-" in m:
+                head, tail = m.rsplit("-", 1)
+                if tail.isdigit():
+                    stem = head
+            if model.startswith(stem):
                 pricing = price
                 break
 
@@ -336,7 +343,9 @@ class InsightsEngine:
 
             # 估算节省的费用
             if total_cache_read > 0:
-                # 假设没有缓存时这些 token 按输入价格计费
+                # 粗略估算：用总成本/总 token 作为加权平均单价。
+                # 实际上输入价通常比输出价低，此处会偏高；若需精准
+                # 应按模型查表的 input 价加权计算。
                 avg_input_price = total_cost / Decimal(max(total_tokens, 1)) * _ONE_MILLION
                 saved = Decimal(total_cache_read) * avg_input_price * Decimal("0.9") / _ONE_MILLION
                 lines.append(f"  Estimated savings: ~${saved:.4f}")

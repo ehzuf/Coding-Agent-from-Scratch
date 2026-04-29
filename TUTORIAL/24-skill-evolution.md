@@ -86,9 +86,16 @@ REVIEW_PROMPT = """分析上面的对话历史，判断是否有值得保存为 
 
 ## 已有 Skill
 
+下面是目录中已有的 Skill 完整内容（含 frontmatter 和正文）。
+
 {existing_skills}
 
-如果新发现的方法属于已有 Skill 的范畴，输出 update 类型。如果是全新的，输出 create 类型。
+判断规则：
+- 如果新发现的方法**完全被**某个已有 Skill 覆盖，输出空数组。
+- 如果新方法**属于**某个已有 Skill 的范畴但能补充或修正其中的步骤，输出 `update` 类型，
+  **并基于上面的原 SKILL.md 做增量修改**；`content` 字段要求返回**完整的**、修改后的 SKILL.md，
+  注意保留原有的有效步骤、只改动需要调整的部分。
+- 如果是全新领域，输出 `create` 类型。
 
 ## 输出格式
 
@@ -111,7 +118,7 @@ REVIEW_PROMPT = """分析上面的对话历史，判断是否有值得保存为 
 
 Prompt 里的三个判断维度——试错、转向、用户纠正——直接对应了 Hermes Agent 的 `_SKILL_REVIEW_PROMPT`。这不是随意设计的，它抓住了"经验"的本质：**不是任何操作都值得记住，只有那些"走弯路后找到正确路"的经验才有复用价值**。
 
-`{existing_skills}` 占位符会在运行时替换为当前已有的 Skill 列表，让 LLM 能做去重判断——已有 Skill 覆盖的场景不需要重复创建，但可以更新（进化）。
+`{existing_skills}` 占位符会在运行时注入**已有 Skill 的完整 SKILL.md 内容**（而不是仅仅 name+description）。之所以要注入完整内容，是因为 `update` 语义期望的是“**基于原骨架的增量修订**”：如果 LLM 看不到原 Skill 的步骤，它只能凭空改写，实际等同于 rewrite，原有的有效步骤可能被覆盖。换一句话：**patch 有意义的前提是 LLM 看得到被 patch 的对象**。
 
 ## 对话摘要构建
 
@@ -170,38 +177,76 @@ def _build_conversation_summary(messages: list[dict], max_chars: int = 20000) ->
 
 ## 已有 Skill 清单
 
-审查前需要告诉 LLM 当前已有哪些 Skill，避免重复创建：
+审查前需要告诉 LLM 当前已有哪些 Skill，这样它才能（1）避免重复创建，（2）在 `update` 时基于原内容做增量修改。**所以需要注入的是完整的 SKILL.md，而不是仅 name + description**：
 
 ```python
-def _build_skill_manifest(skills_dir: str) -> str:
+def _build_skill_manifest(
+    skills_dir: str,
+    max_total_chars: int = 8000,
+    max_skill_chars: int = 3000,
+) -> str:
     """
-    扫描 skills 目录，构建已有 Skill 的清单。
-
-    输出格式：
-      - code-review: 审查代码变更并给出建议
-      - k8s-troubleshoot: K8s Pod 排障流程
+    扫描 skills 目录，构建已有 Skill 的清单（含完整正文）。
+    单 Skill 过长或总长度超限的 Skill **整块跳过**，在末尾显式标明并禁止对其 update。
     """
     if not os.path.isdir(skills_dir):
         return "（暂无已有 Skill）"
 
-    lines = []
+    sections: list[str] = []
+    skipped_oversize: list[str] = []
+    skipped_over_budget: list[str] = []
+    total = 0
+
     for entry in sorted(os.listdir(skills_dir)):
         skill_md = os.path.join(skills_dir, entry, "SKILL.md")
         if not os.path.isfile(skill_md):
             continue
         try:
             content = Path(skill_md).read_text(encoding="utf-8")
-            fm, _ = _parse_frontmatter(content)
-            name = fm.get("name", entry)
-            desc = fm.get("description", "")
-            lines.append(f"- {name}: {desc}" if desc else f"- {name}")
         except Exception:
-            lines.append(f"- {entry}")
+            continue
 
-    return "\n".join(lines) if lines else "（暂无已有 Skill）"
+        # 单 Skill 过长：整块跳过，避免截断导致 update 数据丢失
+        if len(content) > max_skill_chars:
+            skipped_oversize.append(entry)
+            continue
+
+        # 用 <skill> 标签包裹，避免 SKILL.md 内部的 ``` 提前闭合外层分隔符
+        section = f'<skill name="{entry}">\n{content}\n</skill>'
+        if total + len(section) > max_total_chars:
+            skipped_over_budget.append(entry)
+            continue
+        sections.append(section)
+        total += len(section)
+
+    parts: list[str] = list(sections)
+    if skipped_oversize:
+        parts.append(
+            "（以下 Skill 因内容过长未展示原文，**禁止对它们输出 update**："
+            + ", ".join(skipped_oversize) + "）"
+        )
+    if skipped_over_budget:
+        parts.append(
+            "（以下 Skill 因总长度超限未展示原文，**禁止对它们输出 update**："
+            + ", ".join(skipped_over_budget) + "）"
+        )
+
+    if not parts:
+        return "（暂无已有 Skill）"
+    return "\n\n".join(parts)
 ```
 
-复用了第 23 篇的 `_parse_frontmatter()` 来读取 frontmatter。只提取 name 和 description——审查 LLM 只需要知道"有个叫 code-review 的 Skill，做代码审查"就够了，不需要看完整内容。
+为什么不是只给 `name + description`？因为审查 LLM 输出 `update` 时需要返回 **完整的**、修改后的 SKILL.md 内容。如果它根本没看到原始骨架，就只能从零拼一份新的——原有的步骤、细节、注意事项很容易被覆盖掉，实际上是 rewrite 而不是 patch。
+
+这里有两个值得展开的细节：
+
+**1）为什么单 Skill 超长时要“整块跳过”而不是截断？**  一旦给出截断后的半截原文，LLM 会认为原 Skill 就这么短，按 prompt 要求返回的“完整修改后的 SKILL.md”也就只有半截。若 `_save_skill` 无防护地 `write_text`，磁盘上完整的 Skill 就会被 **覆盖成短版本**。为避免自进化反而损坏 Skill，给不下就不给，在 manifest 末尾显式禁止 LLM 对其 update。
+
+**2）为什么用 `<skill>` 标签而不是 markdown 代码块？**  实际的 SKILL.md 正文几乎必然包含 ``` 代码块（命令示例、代码片段）。若用 ```markdown ... ``` 包裹，内层的 ``` 会提前闭合外层分隔符，LLM 收到的已有 Skill 直接变成乱码。换成 XML 标签即可完全规避。
+
+成本控制的两道闸：**单 Skill 上限**（默认 3000 字符）和**总长度上限**（默认 8000 字符），给已有 Skill 的空间随 Skill 数量增长不会失控。
+
+另外在落盘环节（`_save_skill` 的 `update` 分支）还需要一道防御：**新内容不得显著短于原文**（阈值如不得少于原长度的 50% 且不得短过 500 字符）。这是兜底直接注入全文的安全网：即便前面安全网有洞或原文本身被系统另外限流，LLM 输出了“短版本”，落盘时还会抓一手。
 
 ## LLM 审查结果解析
 
@@ -327,7 +372,12 @@ class SkillEvolution:
         self._counter += 1
 
     def reset(self) -> None:
-        """重置计数器。Agent 主动调用 skill 工具时调用，跳过后续审查。"""
+        """重置计数器。
+
+        对齐 Hermes 语义：当 Agent 调用 skill_manage（创建 / 更新 SKILL.md）时调用。
+        本实现未接入 skill_manage 工具，此方法作为 API 保留。
+        注意：**不应在执行已有 Skill 时重置**，执行过程中的试错正是需要审查的信号。
+        """
         self._counter = 0
 
     def should_review(self) -> bool:
@@ -429,15 +479,21 @@ if self.skill_evolution:
 
 放在工具**执行完**之后，而不是执行之前。因为计数器统计的是"Agent 实际做了多少事"，而不是"LLM 请求了多少次工具"。
 
-### 主动调用 skill 工具时重置
+### 与 Hermes 的差异：`skill_manage` 工具与 reset 时机
 
-如果 Agent 在对话中主动调用了 `skill` 工具（手动执行 Skill），说明技能相关的操作已经发生了，不需要后台再审查：
+Hermes 的原始计数器不是在执行已有 Skill 时重置，而是在 Agent 调用 `skill_manage`（创建 / 更新 SKILL.md 的工具）时才 reset：
 
 ```python
-# _execute_tool 中，执行完 skill 工具后：
-if tool_name == "skill" and self.skill_evolution:
+# Hermes 等价逻辑：写入 Skill 文件时清零
+if tool_name == "skill_manage" and self.skill_evolution:
     self.skill_evolution.reset()
 ```
+
+原因是：**执行已有 Skill** 过程中的试错恰恰是后台审查要关注的信号——它暴露了当前 Skill 让 Agent 碰壁了、需要 patch；而**创建 / 更新 Skill** 的动作本身已经是“审查结果落地”，后台再走一遍纯属浪费。所以 reset 的正确触发点是后者。
+
+我们的简化版**没有涉及 `skill_manage` 工具**（Skill 写入直接由 `_do_review()` 结束时落盘，不经由工具调用循环），因此实际上 **不存在需要 reset 的时机**——对话结束时照常走阈值判断 + `maybe_evolve()` 即可。
+
+`SkillEvolution.reset()` 方法保留是为了与 Hermes API 对齐，也方便后续如果引入 `skill_manage` 工具时可以直接挂接。
 
 ### 对话结束时审查
 

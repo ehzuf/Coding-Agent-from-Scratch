@@ -170,11 +170,12 @@ def build_session_key(
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import Any, Callable, Awaitable, Dict, Optional
 
 from gateway.models import (
     MessageEvent, MessageType, SendResult, SessionSource,
-    Platform, PlatformConfig, build_session_key,
+    Platform, build_session_key,
 )
 
 logger = logging.getLogger(__name__)
@@ -272,8 +273,8 @@ class BasePlatformAdapter(ABC):
         入站消息的统一入口。
         
         立即返回，消息处理在后台任务中进行。
-        支持同会话中断：新消息到达时，如果该会话已有任务在跑，
-        会设置 interrupt event 通知当前任务。
+        同会话消息顺序处理：新消息到达时，若该会话已有任务在跑，
+        新消息排队，等当前任务结束后再处理（本教程不实现运行时中断）。
         """
         if not self._message_handler:
             return
@@ -293,7 +294,7 @@ class BasePlatformAdapter(ABC):
                     logger.error("[%s] Command bypass failed: %s", self.name, e)
                 return
 
-            # 常规消息排队，触发中断信号
+            # 常规消息排队；保留 Event 作为未来实现运行时中断的钩子
             self._pending_messages[session_key] = event
             self._active_sessions[session_key].set()
             return
@@ -396,7 +397,7 @@ class BasePlatformAdapter(ABC):
 
 基类做了几件重要的事：
 
-1. **中断编排**：`handle_message()` 检查会话是否已有任务在跑。如果有，新消息排队并触发 interrupt event。紧急命令（`/stop`、`/new`）绕过排队直接执行——否则会被当成普通消息吞掉。
+1. **串行编排**：`handle_message()` 检查会话是否已有任务在跑。如果有，新消息排队等当前任务结束后再处理（本教程不中断运行中的 Agent，中断机制留作练习）。紧急命令（`/stop`、`/new`）绕过排队直接执行——否则会被当成普通消息吞掉。
 
 2. **竞态防护**：在 `asyncio.create_task` 之前就标记 `_active_sessions`，这样第二条消息到达时不会因为任务还没开始而误判为"没有活跃任务"。
 

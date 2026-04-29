@@ -52,9 +52,16 @@ REVIEW_PROMPT = """分析上面的对话历史，判断是否有值得保存为 
 
 ## 已有 Skill
 
+下面是目录中已有的 Skill 完整内容（含 frontmatter 和正文）。
+
 {existing_skills}
 
-如果新发现的方法属于已有 Skill 的范畴，输出 update 类型。如果是全新的，输出 create 类型。
+判断规则：
+- 如果新发现的方法**完全被**某个已有 Skill 覆盖，输出空数组。
+- 如果新方法**属于**某个已有 Skill 的范畴但能补充或修正其中的步骤，输出 `update` 类型，
+  **并基于上面的原 SKILL.md 做增量修改**；`content` 字段要求返回**完整的**、修改后的 SKILL.md，
+  注意保留原有的有效步骤、只改动需要调整的部分。
+- 如果是全新领域，输出 `create` 类型。
 
 ## 输出格式
 
@@ -125,32 +132,72 @@ def _build_conversation_summary(messages: list[dict], max_chars: int = 20000) ->
     return "\n\n".join(parts)
 
 
-def _build_skill_manifest(skills_dir: str) -> str:
+def _build_skill_manifest(
+    skills_dir: str,
+    max_total_chars: int = 8000,
+    max_skill_chars: int = 3000,
+) -> str:
     """
     扫描 skills 目录，构建已有 Skill 的清单。
 
-    输出格式：
-      - code-review: 审查代码变更并给出建议
-      - k8s-troubleshoot: K8s Pod 排障流程
+    输出完整 SKILL.md 内容（含 frontmatter + 正文），以便 LLM 做 update/patch。
+
+    关键设计：
+      - 单 Skill 超过 max_skill_chars **整块跳过**而不截断。因为一旦给出截断内容，
+        LLM 按 prompt 返回的“完整修改后”会基于半截原文，落盘时会把磁盘上完整的
+        Skill 覆盖成短版本，造成数据丢失。
+      - 总长度超限时其余 Skill 同样整块跳过。
+      - 用 <skill name="xxx">...</skill> 标签包裹而不是 markdown 代码块，
+        避免 SKILL.md 内部的 ``` 提前闭合外层分隔符。
+      - 被跳过的 Skill 会在 manifest 末尾显式列出，并**禁止 LLM 对其 update**，
+        让 LLM 绕开这些原文不可见的 Skill。
     """
     if not os.path.isdir(skills_dir):
         return "（暂无已有 Skill）"
 
-    lines = []
+    sections: list[str] = []
+    skipped_oversize: list[str] = []
+    skipped_over_budget: list[str] = []
+    total = 0
+
     for entry in sorted(os.listdir(skills_dir)):
         skill_md = os.path.join(skills_dir, entry, "SKILL.md")
         if not os.path.isfile(skill_md):
             continue
         try:
             content = Path(skill_md).read_text(encoding="utf-8")
-            fm, _ = _parse_frontmatter(content)
-            name = fm.get("name", entry)
-            desc = fm.get("description", "")
-            lines.append(f"- {name}: {desc}" if desc else f"- {name}")
         except Exception:
-            lines.append(f"- {entry}")
+            continue
 
-    return "\n".join(lines) if lines else "（暂无已有 Skill）"
+        # 单 Skill 过长：整块跳过，避免截断导致 update 数据丢失
+        if len(content) > max_skill_chars:
+            skipped_oversize.append(entry)
+            continue
+
+        section = f'<skill name="{entry}">\n{content}\n</skill>'
+        if total + len(section) > max_total_chars:
+            skipped_over_budget.append(entry)
+            continue
+        sections.append(section)
+        total += len(section)
+
+    parts: list[str] = list(sections)
+    if skipped_oversize:
+        parts.append(
+            "（以下 Skill 因内容过长未展示原文，**禁止对它们输出 update**："
+            + ", ".join(skipped_oversize)
+            + "）"
+        )
+    if skipped_over_budget:
+        parts.append(
+            "（以下 Skill 因总长度超限未展示原文，**禁止对它们输出 update**："
+            + ", ".join(skipped_over_budget)
+            + "）"
+        )
+
+    if not parts:
+        return "（暂无已有 Skill）"
+    return "\n\n".join(parts)
 
 
 def _parse_review_result(text: str) -> list[dict]:
@@ -220,6 +267,15 @@ def _save_skill(skill: dict, skills_dir: str) -> str | None:
         # 不存在则跳过
         if not os.path.isfile(skill_md):
             return None
+        # 防御：新内容显著短于原文则拒写，防止 LLM 基于截断/丢失的原文改写
+        # 阈值：新长度 >= max(原长度 * 50%, 原长度 - 500)，两者取大
+        # 短文用绝对差（- 500）宽容，长文用百分比（50%）避免误杀正常收缩
+        try:
+            existing = Path(skill_md).read_text(encoding="utf-8")
+        except Exception:
+            existing = ""
+        if existing and len(content) < max(len(existing) * 0.5, len(existing) - 500):
+            return None
         Path(skill_md).write_text(content, encoding="utf-8")
         return f"Skill '{name}' 已更新"
 
@@ -256,7 +312,12 @@ class SkillEvolution:
         self._counter += 1
 
     def reset(self) -> None:
-        """重置计数器。Agent 主动调用 skill 工具时调用，跳过后续审查。"""
+        """重置计数器。
+
+        对齐 Hermes 语义：当 Agent 调用 skill_manage（创建 / 更新 SKILL.md）时调用。
+        本实现未接入 skill_manage 工具，此方法作为 API 保留。
+        注意：不应在执行已有 Skill 时重置，执行过程中的试错正是需要审查的信号。
+        """
         self._counter = 0
 
     def should_review(self) -> bool:

@@ -127,6 +127,17 @@ def build_system_prompt(
         return None
 
     return "\n\n".join(parts)
+
+
+def get_context_info(cwd: str = ".") -> dict:
+    """返回当前上下文的概要信息，用于 CLI 显示。"""
+    abs_cwd = os.path.abspath(cwd)
+    agents_path = find_agents_md(cwd)
+    return {
+        "cwd": abs_cwd,
+        "agents_md_loaded": agents_path is not None,
+        "agents_md_path": str(agents_path) if agents_path else None,
+    }
 ```
 
 ## 在 CLI 中使用
