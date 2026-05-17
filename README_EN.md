@@ -24,7 +24,7 @@ One article per mechanism, with complete runnable code.
 | Language | TypeScript | Python |
 | Lines of Code | 512,000+ | **~7,500** |
 | Source Files | ~1,900 | **~30** |
-| Foundation Tutorials | — | **24 articles** |
+| Foundation Tutorials | — | **25 articles** |
 | Advanced Tutorials | — | **9 articles** (referencing [Hermes Agent](https://github.com/nousresearch/hermes-agent)) |
 
 ## Architecture
@@ -82,6 +82,7 @@ From "it works" to "it works well" — project awareness, memory, and extensibil
 | 22 | MCP Client — Connect to External Tool Servers | [22-mcp-client.md](TUTORIAL/22-mcp-client.md) |
 | 23 | Skills System — Markdown-defined Reusable Workflows | [23-skills.md](TUTORIAL/23-skills.md) |
 | 24 | Skill Evolution — Auto-extract Experience After Complex Tasks | [24-skill-evolution.md](TUTORIAL/24-skill-evolution.md) |
+| 25 | Background Bash — Long-running Commands Without Blocking the Conversation | [25-background-bash.md](TUTORIAL/25-background-bash.md) |
 
 ### Advanced Series: From Coding Agent to Personal Assistant
 
@@ -126,7 +127,8 @@ agent/
     ├── glob.py / grep.py  # Search Tools
     ├── agent_tool.py      # Sub-Agent Tool
     ├── send_message.py    # Agent Communication
-    └── plan_mode.py       # Plan Mode Tool
+    ├── plan_mode.py       # Plan Mode Tool
+    └── background/        # Background Bash Tasks (process hosting + notification queue + SleepTool)
 ```
 
 ## Quick Start

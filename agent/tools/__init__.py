@@ -17,6 +17,12 @@ from .glob import GlobTool
 from .grep import GrepTool
 from .agent_tool import AgentTool
 from .send_message import SendMessageTool
+from .background import (
+    BashOutputTool,
+    KillBashTool,
+    ListBackgroundTasksTool,
+    SleepTool,
+)
 
 # 所有内置工具的实例
 BUILTIN_TOOLS: list[Tool] = [
@@ -27,6 +33,10 @@ BUILTIN_TOOLS: list[Tool] = [
     EditTool(),
     GlobTool(),
     GrepTool(),
+    BashOutputTool(),
+    KillBashTool(),
+    ListBackgroundTasksTool(),
+    SleepTool(),
 ]
 
 

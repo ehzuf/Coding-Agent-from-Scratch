@@ -1932,6 +1932,104 @@ REPL 新增命令：
 
 ---
 
+#### Step 24 — Skill 自进化（Skill Evolution）
+**对应 Claude Code 源码：** 无（Claude Code 未实现）；**对齐 Hermes：** `run_agent.py` 的 `_spawn_background_review()`
+
+已实现。新增 `agent/skill_evolution.py`，对话结束后自动把对话经验沉淀为可复用的 Skill：
+
+核心内容：
+- **SkillEvolution 数据类**：llm、threshold、`_tool_call_counter`、`_last_review_counter`
+- **触发时机**：`tick()` 在每次工具调用后递增计数；`should_review()` 判断累计工具调用数是否达到阈值（默认 10）
+- **审查入口**（`maybe_evolve(messages)`）：
+  - 达到阈值后，用独立 LLM 调用分析完整对话历史
+  - Prompt 让 LLM 输出 JSON：`{"create": [...], "update": [...]}`
+  - `create`：从对话中提炼出新的可复用技能；`update`：对已有 Skill 做增量修正
+  - 成功保存后调用 `reset()` 归零计数器
+- **已有 Skill 完整展示**（`_build_skill_manifest()`）：
+  - 把 `~/.coding-agent/skills/<name>/SKILL.md` 的完整原文列给 LLM
+  - 不做截断——避免 LLM 基于截断摘要改写，反而把正文改短
+- **写入防御**（`_save_skill()`）：
+  - `create`：拒绝与已有 Skill 重名
+  - `update`：拒绝 `len(new) < max(len(old) * 0.5, len(old) - 500)` 的显著收缩
+  - 文件落地：`~/.coding-agent/skills/<name>/SKILL.md`，带 frontmatter（name / description）
+- **Agent 集成**：
+  - `skill_evolution` 参数传入 Agent 构造函数
+  - `_execute_tool()` 结束时调用 `tick()` 计数
+  - 对话结束（`_run_tool_loop()` / `stream()` 返回前）调用 `maybe_evolve()`
+  - `build_agent()` 自动创建 SkillEvolution 实例
+- **与 Step 23 Skills 系统的闭环**：
+  - Step 23 负责**加载**已有 Skill
+  - Step 24 负责**生成/更新** Skill
+  - 下次启动时新 Skill 自动被加载，形成正反馈循环
+
+关键设计：
+1. **纯后台生效**：审查发生在对话结束后，对主对话路径零影响
+2. **简化 vs Hermes**：Hermes 用 fork + daemon 线程做后台审查；我们直接在主进程内同步 LLM 调用，省掉进程间通信，代价是"对话结束到进程退出"之间多出一次 LLM 等待
+3. **截断陷阱**：update 模式必须防止 LLM 基于不完整原文重写导致内容坍缩——用字符数阈值兜底
+4. **阈值可调**：`SKILL_EVOLVE_THRESHOLD = 10`（常量），生产环境可根据对话粒度调整
+5. **单用户目录隔离**：`~/.coding-agent/skills/` 不区分项目，Skill 是用户级跨项目资产
+
+Agent 新增参数：
+- `skill_evolution`: Skill 自进化管理器
+
+环境变量：
+- `AGENT_NO_SKILL_EVOLUTION`: 禁用 Skill 自进化
+
+---
+
+#### Step 25 — 后台 Bash 命令（Background Bash）
+**对应 Claude Code 源码：** `tools/BashTool/` 的 `run_in_background` + `tools/SleepTool/` + `services/bashToolQueue/messageQueueManager.ts` + `services/bashToolQueue/channelNotification.ts` + `query.ts` 的 drain 阈值开关
+
+已实现。新增 `agent/tools/background/` 子包，把长任务扔到后台跑，不再卡住对话循环：
+
+核心内容（五层解耦）：
+- **`shell.py`（进程托管）**：
+  - `spawn_background()` 用 `subprocess.Popen` 拉起命令，stdout/stderr 重定向到 `~/.coding-agent/bg_tasks/<task_id>/{stdout.log, stderr.log}`
+  - 新进程进入独立进程组（`os.setsid`），父进程退出不会杀子进程
+  - `poll_status()` / `read_output()` / `kill_task()` 提供查询与终止接口
+- **`registry.py`（任务注册表）**：
+  - `BackgroundTaskRegistry` 以 `task_id` 为键管理 `BackgroundTask` 实例
+  - 线程安全：`threading.Lock` 保护 dict 访问
+  - 生命周期：spawn → running → exited / killed
+- **`notifications.py`（通知队列）**：
+  - 后台任务状态变化（新增输出、退出）时，由 `poll_status()` 推入 `NotificationQueue`
+  - `drain(max_priority)` 按优先级拉出通知，注入到主对话的 messages
+  - 三档优先级：`now=0 / next=1 / later=2`（数值越大优先级越低）
+- **`sleep.py`（SleepTool）**：
+  - LLM 主动让出时间片：参数 `max_seconds`（1–300，默认 10）、`poll_interval`（0.05–5，默认 1.0）
+  - 轮询 `has_pending_notifications()`，一有 `later` 级及以下通知立刻醒
+  - 参数依据：`poll_interval=1.0` 对齐 Claude Code `channelNotification.ts` "wakes within 1s"；`max_seconds` 上限 300 对齐 Anthropic Prompt Cache TTL 5 分钟
+- **`tools.py`（三件套工具）**：
+  - `BashOutput`：读某个 task_id 新增的 stdout/stderr（带 offset 游标）
+  - `KillBash`：终止指定 task_id
+  - `ListBackgroundTasks`：列出所有后台任务及状态
+  - 同时给 `bash.py` 的 `BashTool` 加 `run_in_background: bool` 参数，非阻塞返回 `task_id`
+
+两条通知路径：
+- **搭车 drain（被动）**：每轮 LLM 调用前，主循环用 `max_priority=next` 把 `now/next` 级通知注入 messages，LLM 自然看到后台进展
+- **SleepTool 主动等待**：LLM 调了 sleep 后，下一轮 drain **门槛放宽到 `later`**，把 `later` 级通知也一起捞进来
+
+关键设计：
+1. **角色分离**：SleepTool 是"醒闹钟"——只 peek `has_pending_notifications()` 不消费；drain 是"搬运工"——消费通知并搬进 messages。职责隔离避免重复消费
+2. **阈值数值对照**：`now=0 / next=1 / later=2`，数值越大优先级越低。drain 的 `max_priority` 是**准入上限**，默认 `next` 只放 `now/next` 进来；改成 `later` 意味着**门槛放宽**，连 `later` 也一起捞
+3. **消费即重置**：`_last_turn_sleep_ran` 是**一次性开关**——sleep 下一轮升级 drain 门槛后立刻恢复默认 `next`，避免门槛永久放宽导致低优先级通知淹没对话
+4. **进程隔离**：`os.setsid` 独立进程组 + `preexec_fn` 防止 SIGINT 穿透；进程退出码 / 信号码完整保留到 registry
+5. **输出文件而非管道**：日志落盘到 `~/.coding-agent/bg_tasks/<task_id>/`，BashOutput 按 offset 增量读；管道方案在长任务下会阻塞 Popen 内部缓冲区
+6. **工具注册**：`BackgroundTaskRegistry` / `NotificationQueue` 在 `build_agent()` 中创建单例，注入到 BashTool / BashOutput / KillBash / ListBackgroundTasks / SleepTool 共享
+
+Agent 新增参数：
+- `background_registry`: 后台任务注册表
+- `notification_queue`: 通知队列
+
+新增工具：
+- `bash`（扩展 `run_in_background` 参数）
+- `bash_output` / `kill_bash` / `list_background_tasks` / `sleep`
+
+存储位置：
+- `~/.coding-agent/bg_tasks/<task_id>/stdout.log` / `stderr.log` / `meta.json`
+
+---
+
 #### 第二阶段实现路线
 
 ```
@@ -1941,6 +2039,8 @@ Step 20  Session Memory      [中]  ← 依赖 Step 16 会话持久化
 Step 21  Auto-Memory         [高]  ← 依赖 Step 18 项目记忆文件体系
 Step 22  MCP Client          [高]  ← 独立功能，Skills 的前置依赖
 Step 23  Skills 系统          [高]  ← 依赖 Step 22 MCP
+Step 24  Skill 自进化         [中]  ← 依赖 Step 23 Skills 系统，闭环正反馈
+Step 25  后台 Bash 命令       [高]  ← 独立功能，改造 Bash 工具 + 注入五层子包
 ```
 
 排序逻辑：
@@ -1948,6 +2048,8 @@ Step 23  Skills 系统          [高]  ← 依赖 Step 22 MCP
 2. **Step 19 Plan Mode** 紧跟——独立功能无前置依赖，对复杂任务质量提升明显
 3. **Step 20-21 Session Memory → Auto-Memory** 按依赖顺序——先做会话内记忆，再做跨会话记忆
 4. **Step 22-23 MCP → Skills** 放最后——复杂度最高，且 Skills 依赖 MCP 提供外部 Skill 来源
+5. **Step 24 Skill 自进化** 在 Skills 之后——与 Step 23 构成「加载 ↔ 生成」闭环
+6. **Step 25 后台 Bash** 独立模块——引入五层子包（shell / registry / notifications / sleep / tools），改造 BashTool
 
 ---
 

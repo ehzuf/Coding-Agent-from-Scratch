@@ -46,6 +46,8 @@
 | 10 | [权限系统](10-permission-system.md) | 危险操作先问人，别让 Agent 乱来 |
 | 11 | [Prompt Caching](11-prompt-caching.md) | 缓存 system prompt，API 费用省 90% |
 | 12 | [并发工具执行](12-concurrent-tool-execution.md) | 多个工具并行跑，效率翻倍 |
+| 25 | [后台 Bash 命令](25-background-bash.md) | 长任务扔到后台跑，不再卡住对话 |
+| 26 | [沙箱与安全隔离](26-sandbox-security.md) | OS 层强制限制文件/网络访问，防止间接攻击 |
 
 这一组解决的是生产环境里绕不开的问题：健壮性、安全性、成本和性能。
 
@@ -80,10 +82,13 @@
 | 22 | [MCP Client](22-mcp-client.md) | 接入 MCP 协议，连接外部工具生态 |
 | 23 | [Skills 系统](23-skills.md) | 写个 Markdown 就能定义可复用的工作流 |
 | 24 | [Skill 自进化](24-skill-evolution.md) | 复杂任务后自动沉淀经验，越用越聪明 |
+| 27 | [可观测性与 Tracing](27-observability-tracing.md) | 成本追踪、Span 计时、事件打点，行为可回溯 |
+| 28 | [Agent 评测](28-agent-evaluation.md) | 批量执行、自动评分、轨迹压缩，数字说话 |
 
-到这里，Agent 具备了项目感知、长期记忆、自定义扩展和自我进化能力——一个完整的 Coding Agent。
+到这里，Agent 具备了项目感知、长期记忆、自定义扩展、自我进化、可观测和可评测能力——一个完整的 Coding Agent。
 
 ---
+
 ## 最后
 
 跟随本系列文章的完整实现路径，你将：

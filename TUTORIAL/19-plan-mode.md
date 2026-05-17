@@ -106,9 +106,11 @@ READONLY_TOOLS = {"read", "glob", "grep", "get_current_time", "agent", "send_mes
 
 BASH_READONLY_PREFIXES = (
     "ls", "cat", "head", "tail", "find", "grep", "rg",
-    "wc", "file", "which", "echo", "pwd", "tree",
+    "wc", "file", "which", "echo", "pwd", "tree", "du", "df",
     "git status", "git log", "git diff", "git show", "git branch",
-    "python --version", "pip list", "pip show",
+    "git remote", "git tag",
+    "python --version", "python3 --version", "node --version",
+    "pip list", "pip show",
 )
 
 def is_tool_readonly(tool_name, tool_input):
@@ -149,19 +151,19 @@ def _execute_tool(self, tool_use):
             "请先调用 exit_plan_mode 提交方案后再执行修改操作。"
         )
 
-    # Plan Mode 状态切换
+    # PreToolUse Hook ...
+    # 执行工具 ...
+
+    # Plan Mode 状态切换（在工具成功执行后修改，避免 Hook 阻止后状态不一致）
     if tool_name == "enter_plan_mode":
         self.plan_mode = True
     elif tool_name == "exit_plan_mode":
         self.plan_mode = False
-
-    # PreToolUse Hook ...
-    # 执行工具 ...
 ```
 
 关键设计：
-- **状态在工具执行前切换** —— enter_plan_mode 执行时先设 `plan_mode = True`，这样后续工具调用立即受限
-- **exit_plan_mode 执行时恢复** —— 设 `plan_mode = False`，后续工具调用恢复正常
+- **状态在工具执行后切换** —— 先执行工具，成功后再修改状态，避免 Hook 阻止时状态不一致
+- **exit_plan_mode 执行后恢复** —— 设 `plan_mode = False`，后续工具调用恢复正常
 - **Plan Mode 检查在权限检查之后** —— 权限系统是硬约束，Plan Mode 是软约束。被权限拒绝的操作不需要再检查 Plan Mode
 
 工具注册在 `__init__` 中，与 AgentTool、SendMessageTool 一起：

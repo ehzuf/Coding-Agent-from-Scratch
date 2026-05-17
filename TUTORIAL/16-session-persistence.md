@@ -55,7 +55,7 @@ JSONL 是最适合这个场景的格式：
 1. **追加写入**：新消息直接 append 到文件末尾，O(1) 操作
 2. **逐行解析**：恢复时逐行读取，单行 JSON 解析失败不影响其他行
 3. **可读可调试**：用任何文本编辑器都能查看历史
-4. **Claude Code 也是这么做的**：`history.jsonl`
+4. **Claude Code 的会话存储也用 JSONL 格式**（存储在 `~/.claude/projects/<hash>/` 下）
 
 ### JSONL 文件结构
 

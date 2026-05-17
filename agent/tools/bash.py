@@ -53,6 +53,11 @@ class BashTool(Tool):
 - 标准输出内容
 - 标准错误内容
 
+对于长时间运行的命令（如 npm run dev / pytest --watch / python train.py），
+传 run_in_background=true 立即托管到后台并返回 task_id，
+之后用 bash_output(task_id) 查看实时输出，用 kill_bash(task_id) 终止。
+任务完成后会自动以 <task-notification> 通知形式出现在下一轮对话上下文中。
+
 注意：此工具功能强大，后续会添加权限控制。"""
 
     @property
@@ -66,11 +71,18 @@ class BashTool(Tool):
                 },
                 "timeout": {
                     "type": "number",
-                    "description": "超时时间（毫秒），默认 120000",
+                    "description": "超时时间（毫秒），默认 120000（仅同步模式生效）",
                 },
                 "cwd": {
                     "type": "string",
                     "description": "工作目录，默认为当前目录",
+                },
+                "run_in_background": {
+                    "type": "boolean",
+                    "description": (
+                        "设为 true 将命令托管到后台并立即返回 task_id，"
+                        "不阻塞当前对话。用于 npm run dev / pytest --watch 等长任务。"
+                    ),
                 },
             },
             "required": ["command"],
@@ -115,10 +127,26 @@ class BashTool(Tool):
         command = input.get("command", "")
         return self._is_readonly(command)
 
+    def _start_background(self, command: str, cwd: str | None) -> str:
+        """启动后台任务，立即返回 task_id，不等进程结束。"""
+        # 延迟导入避免顶层循环依赖
+        from .background import background_registry
+
+        task = background_registry.spawn(command, cwd=cwd)
+        return (
+            f"后台任务已启动\n"
+            f"task_id: {task.id}\n"
+            f"command: {command}\n"
+            f"output_file: {task.output_file}\n"
+            f"提示：用 bash_output(task_id) 查看实时输出，用 kill_bash(task_id) 终止。\n"
+            f"任务完成后将以 <task-notification> 通知形式出现在后续对话上下文中。"
+        )
+
     def call(self, input: dict[str, Any]) -> str:
         command = input.get("command", "")
         timeout = input.get("timeout", 120000)
         cwd = input.get("cwd")
+        run_in_background = bool(input.get("run_in_background", False))
 
         if not command:
             return "错误：command 参数不能为空"
@@ -126,6 +154,10 @@ class BashTool(Tool):
         # 验证工作目录
         if cwd and not os.path.isdir(cwd):
             return f"错误：工作目录不存在: {cwd}"
+
+        # 显式后台分支：立即托管返回 task_id
+        if run_in_background:
+            return self._start_background(command, cwd)
 
         try:
             result = subprocess.run(

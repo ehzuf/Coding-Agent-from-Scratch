@@ -233,12 +233,12 @@ def _execute_tool(self, tool_use: dict) -> str:
 
 ```python
 def _check_and_compact(self) -> None:
-    if not self.enable_compact:
-        return
-
-    # Session Memory：定期更新笔记
+    # Session Memory：定期更新笔记（独立于压缩开关）
     if self.session_memory:
         self.session_memory.maybe_update(self.messages)
+
+    if not self.enable_compact:
+        return
 
     # 检查是否需要压缩
     budget_info = check_context_budget(self.messages, self.compact_threshold)

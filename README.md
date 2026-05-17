@@ -24,7 +24,7 @@
 | 语言 | TypeScript | Python |
 | 代码行数 | 512,000+ | **~7,500** |
 | 源文件数 | ~1,900 | **~30** |
-| 基础教程 | — | **24 篇** |
+| 基础教程 | — | **28 篇** |
 | 进阶教程 | — | **9 篇**（以 [Hermes Agent](https://github.com/nousresearch/hermes-agent) 为参考） |
 
 ## 整体架构
@@ -82,6 +82,10 @@ Agent (消息历史 + Tool Use 循环)
 | 22 | MCP Client — 连接外部工具服务器 | [22-mcp-client.md](TUTORIAL/22-mcp-client.md) |
 | 23 | Skills 系统 — Markdown 定义可复用工作流 | [23-skills.md](TUTORIAL/23-skills.md) |
 | 24 | Skill 自进化 — 复杂任务后自动沉淀经验 | [24-skill-evolution.md](TUTORIAL/24-skill-evolution.md) |
+| 25 | 后台 Bash 命令 — 长任务扔到后台跑，不再卡住对话 | [25-background-bash.md](TUTORIAL/25-background-bash.md) |
+| 26 | 沙箱与安全隔离 — OS 层强制限制文件/网络访问 | [26-sandbox-security.md](TUTORIAL/26-sandbox-security.md) |
+| 27 | 可观测性与 Tracing — 成本追踪 + Span 计时 + 事件打点 | [27-observability-tracing.md](TUTORIAL/27-observability-tracing.md) |
+| 28 | Agent 评测 — 批量执行 + 自动评分 + 轨迹压缩 | [28-agent-evaluation.md](TUTORIAL/28-agent-evaluation.md) |
 
 ### 进阶系列：从 Coding Agent 到个人助理
 
@@ -126,7 +130,8 @@ agent/
     ├── glob.py / grep.py  # 搜索工具
     ├── agent_tool.py      # 子 Agent 工具
     ├── send_message.py    # Agent 间通信
-    └── plan_mode.py       # 规划模式工具
+    ├── plan_mode.py       # 规划模式工具
+    └── background/        # 后台 Bash 任务（进程托管 + 通知队列 + SleepTool）
 ```
 
 ## 快速开始

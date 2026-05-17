@@ -200,6 +200,9 @@ class Agent:
         self._total_input_tokens: int = 0
         self._total_output_tokens: int = 0
         self._tool_use_count: int = 0
+        # 上一轮是否调用了 SleepTool——决定下一轮 drain 时是否把 later 级通知也拉进来
+        # 对齐 reference/query.ts 的 sleepRan ? 'later' : 'next' 语义
+        self._last_turn_sleep_ran: bool = False
         # 子 Agent 注册表
         # key: agent_id, value: Agent 实例
         # 主 Agent 保存所有子 Agent，支持后续通过 send_message 继续对话
@@ -563,6 +566,63 @@ class Agent:
             return prompt + f"\n\n[Hook context] {context}"
         return prompt
 
+    def _drain_background_notifications(self) -> None:
+        """
+        把后台任务的完成通知搭车到 messages 里。
+
+        调用时机：每一轮 LLM 调用之前。仅修改 messages，
+        不会触发额外的 API 调用——因此不打断用户体验，
+        而是搭乘用户当前这一回合一起送给 LLM。
+
+        优先级阈值（对齐 reference/query.ts L1570）：
+          - 默认 drain 阈值 = "next"：只带上用户隐含优先级的通知，
+            后台任务（later）暂时留在队列，避免打断用户当前话题
+          - 如果上一轮 Agent 主动调了 SleepTool，说明它就是在等异步结果，
+            门槛放宽到 "later" 把后台通知也一起捞出来
+
+        详见 TUTORIAL/25-background-bash.md。
+        """
+        try:
+            from agent.tools.background import notification_queue
+        except Exception:
+            return
+
+        max_priority = "later" if self._last_turn_sleep_ran else "next"
+        # 消费即重置——sleepRan 只影响紧随其后的那一轮 drain
+        self._last_turn_sleep_ran = False
+
+        notifs = notification_queue.drain(
+            agent_id=None,
+            max_priority=max_priority,
+        )
+        if not notifs:
+            return
+
+        merged_xml = "\n\n".join(n.value for n in notifs)
+        self.messages.append({
+            "role": "user",
+            "content": (
+                "[background-task-updates]\n"
+                "以下为后台任务自动上报的状态通知，请根据情况决定是否向用户说明或处理：\n"
+                f"{merged_xml}"
+            ),
+        })
+        self._persist_message(self.messages[-1])
+
+    def _track_sleep_tool_invocation(self, tool_uses: list[dict]) -> None:
+        """
+        扫描本轮 tool_uses，若含 SleepTool 则打上标记。
+
+        下一轮 `_drain_background_notifications` 会据此把 drain 门槛从
+        'next' 放宽到 'later'，把原本不插队的后台通知也拉进 messages。
+        """
+        try:
+            from agent.tools.background.sleep import SLEEP_TOOL_NAME
+        except Exception:
+            return
+        if any(tu.get("name") == SLEEP_TOOL_NAME for tu in tool_uses):
+            self._last_turn_sleep_ran = True
+
     def _run_tool_loop(self, prompt: str) -> LLMResponse:
         """
         执行完整的 Tool Use 循环（非流式）。
@@ -594,6 +654,9 @@ class Agent:
         turn_count = 0
         while turn_count < self.max_turns:
             turn_count += 1
+
+            # 搭车点：把后台任务完成通知合并进 messages（不触发独立调用）
+            self._drain_background_notifications()
 
             try:
                 # 调用 LLM（带重试）
@@ -641,6 +704,9 @@ class Agent:
             )
             self.messages.extend(tool_result_messages)
             self._persist_messages(tool_result_messages)
+
+            # 追踪 SleepTool 调用——下一轮 drain 时把 later 级通知也拉进来
+            self._track_sleep_tool_invocation(response.tool_uses)
 
         # 达到 max_turns 限制
         return LLMResponse(
@@ -697,6 +763,9 @@ class Agent:
 
         while turn_count < self.max_turns:
             turn_count += 1
+
+            # 搭车点：把后台任务完成通知合并进 messages
+            self._drain_background_notifications()
 
             # 尝试使用真正的流式 API（Anthropic 和 OpenAI 都支持）
             if isinstance(self.llm, (AnthropicLLM, OpenAILLM)):
@@ -828,6 +897,9 @@ class Agent:
                         self.messages.extend(tool_result_messages)
                         self._persist_messages(tool_result_messages)
 
+                        # 追踪 SleepTool 调用——下一轮 drain 时把 later 级通知也拉进来
+                        self._track_sleep_tool_invocation(current_tool_uses)
+
                         # 继续下一轮（tool_use 后的回复）
                         continue
 
@@ -919,6 +991,9 @@ class Agent:
             )
             self.messages.extend(tool_result_messages)
             self._persist_messages(tool_result_messages)
+
+            # 追踪 SleepTool 调用——下一轮 drain 时把 later 级通知也拉进来
+            self._track_sleep_tool_invocation(response.tool_uses)
 
         # 达到 max_turns 限制
         if final_response is None:
