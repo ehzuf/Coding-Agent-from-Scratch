@@ -25,7 +25,7 @@
 | 代码行数 | 512,000+ | **~7,500** |
 | 源文件数 | ~1,900 | **~30** |
 | 基础教程 | — | **28 篇** |
-| 进阶教程 | — | **9 篇**（以 [Hermes Agent](https://github.com/nousresearch/hermes-agent) 为参考） |
+| 进阶教程 | — | **10 篇**（以 [Hermes Agent](https://github.com/nousresearch/hermes-agent) 为参考） |
 
 ## 整体架构
 
@@ -102,6 +102,7 @@ Agent (消息历史 + Tool Use 循环)
 | 07 | 多平台消息网关 — Telegram/Discord/Slack 适配 | [07-gateway.md](TUTORIAL-ADVANCED/07-gateway.md) |
 | 08 | 定时任务系统 — 内置 Cron 调度器 | [08-cron-system.md](TUTORIAL-ADVANCED/08-cron-system.md) |
 | 09 | RL 训练闭环 — 轨迹生成 + GRPO 训练编排 | [09-rl-training.md](TUTORIAL-ADVANCED/09-rl-training.md) |
+| 10 | 远程 Agent 集成 — A2A 协议 + Agent 互操作 | [10-remote-agent-integration.md](TUTORIAL-ADVANCED/10-remote-agent-integration.md) |
 
 ## 项目结构
 

@@ -88,6 +88,16 @@
 
 ---
 
+## 八、Agent 互操作
+
+> 调用别人的 Agent
+
+| 标题 | 讲了什么 |
+|---|---|
+| [远程 Agent 集成](10-remote-agent-integration.md) | MCP vs A2A vs HTTP API 选型、A2A 协议端到端实现、多轮交互与异步任务 |
+
+---
+
 ## 与基础系列的关系
 
 基础系列从零搭建了 Agent 的核心：对话、工具调用、多 Agent、记忆、Skills。
