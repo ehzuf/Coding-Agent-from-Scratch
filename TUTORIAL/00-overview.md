@@ -84,8 +84,9 @@
 | 24 | [Skill 自进化](24-skill-evolution.md) | 复杂任务后自动沉淀经验，越用越聪明 |
 | 27 | [可观测性与 Tracing](27-observability-tracing.md) | 成本追踪、Span 计时、事件打点，行为可回溯 |
 | 28 | [Agent 评测](28-agent-evaluation.md) | 批量执行、自动评分、报告分析，数字说话 |
+| 29 | [语义级代码搜索](29-semantic-code-search.md) | 超越 grep，tree-sitter AST 解析 + LSP 精确导航 |
 
-到这里，Agent 具备了项目感知、长期记忆、自定义扩展、自我进化、可观测和可评测能力——一个完整的 Coding Agent。
+到这里，Agent 具备了项目感知、长期记忆、自定义扩展、自我进化、可观测、可评测和语义代码理解能力——一个完整的 Coding Agent。
 
 ---
 

@@ -24,8 +24,8 @@
 | 语言 | TypeScript | Python |
 | 代码行数 | 512,000+ | **~7,500** |
 | 源文件数 | ~1,900 | **~30** |
-| 基础教程 | — | **28 篇** |
-| 进阶教程 | — | **10 篇**（以 [Hermes Agent](https://github.com/nousresearch/hermes-agent) 为参考） |
+| 基础教程 | — | **29 篇** |
+| 进阶教程 | — | **11 篇**（以 [Hermes Agent](https://github.com/nousresearch/hermes-agent) 为参考） |
 
 ## 整体架构
 
@@ -86,6 +86,7 @@ Agent (消息历史 + Tool Use 循环)
 | 26 | 沙箱与安全隔离 — OS 层强制限制文件/网络访问 | [26-sandbox-security.md](TUTORIAL/26-sandbox-security.md) |
 | 27 | 可观测性与 Tracing — 成本追踪 + Span 计时 + 事件打点 | [27-observability-tracing.md](TUTORIAL/27-observability-tracing.md) |
 | 28 | Agent 评测 — 批量执行 + 自动评分 + 轨迹压缩 | [28-agent-evaluation.md](TUTORIAL/28-agent-evaluation.md) |
+| 29 | 语义级代码搜索 — tree-sitter AST 解析 + LSP 精确导航 | [29-semantic-code-search.md](TUTORIAL/29-semantic-code-search.md) |
 
 ### 进阶系列：从 Coding Agent 到个人助理
 
@@ -103,6 +104,7 @@ Agent (消息历史 + Tool Use 循环)
 | 08 | 定时任务系统 — 内置 Cron 调度器 | [08-cron-system.md](TUTORIAL-ADVANCED/08-cron-system.md) |
 | 09 | RL 训练闭环 — 轨迹生成 + GRPO 训练编排 | [09-rl-training.md](TUTORIAL-ADVANCED/09-rl-training.md) |
 | 10 | 远程 Agent 集成 — A2A 协议 + Agent 互操作 | [10-remote-agent-integration.md](TUTORIAL-ADVANCED/10-remote-agent-integration.md) |
+| 11 | Computer Use — 屏幕操控与浏览器自动化 | [11-computer-use.md](TUTORIAL-ADVANCED/11-computer-use.md) |
 
 ## 项目结构
 

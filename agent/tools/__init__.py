@@ -15,6 +15,7 @@ from .write import WriteTool
 from .edit import EditTool
 from .glob import GlobTool
 from .grep import GrepTool
+from .symbol_search import SymbolSearchTool
 from .agent_tool import AgentTool
 from .send_message import SendMessageTool
 from .background import (
@@ -33,6 +34,7 @@ BUILTIN_TOOLS: list[Tool] = [
     EditTool(),
     GlobTool(),
     GrepTool(),
+    SymbolSearchTool(),
     BashOutputTool(),
     KillBashTool(),
     ListBackgroundTasksTool(),
@@ -65,4 +67,4 @@ def to_api_tools(tools: list[Tool] | None = None) -> list[dict]:
     return [tool.to_api_format() for tool in tools]
 
 
-__all__ = ["Tool", "AgentTool", "SendMessageTool", "get_tools", "find_tool", "to_api_tools", "BUILTIN_TOOLS"]
+__all__ = ["Tool", "AgentTool", "SendMessageTool", "SymbolSearchTool", "get_tools", "find_tool", "to_api_tools", "BUILTIN_TOOLS"]

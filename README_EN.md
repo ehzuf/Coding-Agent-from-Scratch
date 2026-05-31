@@ -24,8 +24,8 @@ One article per mechanism, with complete runnable code.
 | Language | TypeScript | Python |
 | Lines of Code | 512,000+ | **~7,500** |
 | Source Files | ~1,900 | **~30** |
-| Foundation Tutorials | — | **25 articles** |
-| Advanced Tutorials | — | **9 articles** (referencing [Hermes Agent](https://github.com/nousresearch/hermes-agent)) |
+| Foundation Tutorials | — | **29 articles** |
+| Advanced Tutorials | — | **11 articles** (referencing [Hermes Agent](https://github.com/nousresearch/hermes-agent)) |
 
 ## Architecture
 
@@ -99,6 +99,8 @@ Referencing [Hermes Agent](https://github.com/nousresearch/hermes-agent), dissec
 | 07 | Multi-Platform Gateway — Telegram/Discord/Slack Adapters | [07-gateway.md](TUTORIAL-ADVANCED/07-gateway.md) |
 | 08 | Cron System — Built-in Task Scheduler | [08-cron-system.md](TUTORIAL-ADVANCED/08-cron-system.md) |
 | 09 | RL Training Loop — Trajectory Generation + GRPO Orchestration | [09-rl-training.md](TUTORIAL-ADVANCED/09-rl-training.md) |
+| 10 | Remote Agent Integration — A2A Protocol + Agent Interop | [10-remote-agent-integration.md](TUTORIAL-ADVANCED/10-remote-agent-integration.md) |
+| 11 | Computer Use — Screen Control & Browser Automation | [11-computer-use.md](TUTORIAL-ADVANCED/11-computer-use.md) |
 
 ## Project Structure
 
